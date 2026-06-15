@@ -108,7 +108,9 @@ If no issues are found, say so clearly: "No issues found in PR #N."
 
 ## Build Mode — Post inline review comments
 
-When running in build mode, after analysis do the following for each issue:
+When running in build mode, post the comments directly without repeating the plan-mode analysis output. If the user switches from plan to build mid-conversation (e.g. says "post suggestions now"), reuse the issues already identified — do not re-analyse the diff.
+
+After analysis (or reusing prior analysis), do the following for each issue:
 
 ### Post one inline comment per issue
 
@@ -152,7 +154,18 @@ curl -s -X POST \
   }"
 ```
 
-**Comment body format** — keep it concise and actionable:
+**Comment body format** — keep it concise and actionable. When the fix is a one-to-one line replacement, use GitHub's suggestion block so the author can apply it with one click:
+
+```
+<brief explanation of the problem>
+
+```suggestion
+<corrected line(s)>
+```
+```
+
+For issues where a suggestion block is not applicable (e.g. architectural changes, deletions, multi-file fixes), fall back to a short prose comment:
+
 ```
 **[SEVERITY] Short title**
 
@@ -228,6 +241,9 @@ gh api repos/{owner}/{repo}/pulls/<PR>/comments \
   -f side=RIGHT -F start_line=<N> -F line=<M> \
   -f start_side=RIGHT \
   -f body=<text>
+
+# Post inline comment with suggestion block (one-click apply for author)
+# body should contain:  ```suggestion\n<corrected lines>\n```
 
 # Post top-level PR comment
 gh pr comment <PR_NUMBER> -b "<text>"
