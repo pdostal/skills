@@ -5,6 +5,13 @@ description: Use when the user asks to create a PR, MR, merge request, pull requ
 
 # Create PR / MR Skill
 
+## IMPORTANT: Only use this skill when explicitly asked
+
+**Do NOT create a branch or MR/PR when the user asks to "commit" or "commit and push".**
+A plain "commit and push" means: commit directly to the current branch and push it.
+Only create a new branch and open an MR/PR when the user explicitly says "create a PR",
+"open a MR", "merge request", "pull request", or similar.
+
 ## Native CLI tools
 
 Always prefer the native CLI tool for the platform. Fall back to `curl` against the API only when the native tool is unavailable or not authenticated.
