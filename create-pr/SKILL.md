@@ -91,8 +91,21 @@ Rules:
 1. Stage and commit with a conventional commit message.
 2. Push the branch to `origin`: `git push origin <branch>`
 3. Determine `<namespace>/<repo>` from the `origin` remote URL.
-4. Check for the `AI-Assisted` label; create it if missing.
-5. Create the MR with `--head <namespace>/<repo>` to force the correct head repo (see GitLab caveat below):
+4. Check for an already-open PR/MR on this branch:
+   ```bash
+   # GitHub
+   gh pr list --head <branch> --state open
+
+   # GitLab
+   glab mr list --source-branch <branch> --state opened
+   ```
+   If one exists, show it to the user and **ask what to do**:
+   - **(a) Push onto the existing PR** — just `git push`; the commit appears in the open PR automatically. Do not open a new one.
+   - **(b) Open a new PR anyway** — proceed with the steps below.
+   - **(c) Abort** — stop here.
+   Wait for the user's answer before continuing.
+5. Check for the `AI-Assisted` label; create it if missing.
+6. Create the MR with `--head <namespace>/<repo>` to force the correct head repo (see GitLab caveat below):
    ```bash
    glab mr create \
      --source-branch <branch> \
@@ -102,9 +115,9 @@ Rules:
      --description "<body>" \
      --label "AI-Assisted"
    ```
-6. Verify the MR has a resolved `sha` (see GitLab caveat below).
-7. If `sha` is null: recover using the steps in the caveat section.
-8. Return the MR URL to the user.
+7. Verify the MR has a resolved `sha` (see GitLab caveat below).
+8. If `sha` is null: recover using the steps in the caveat section.
+9. Return the MR URL to the user.
 
 ## GitLab caveat — MR created with no diff (sha: null)
 
