@@ -76,6 +76,14 @@ $SHORT_EXPLANATION_IN_SINGLE_PARAGRAPH
 - Related tickets: [poo#123](https://progress.opensuse.org/issues/123), [bsc#456](https://bugzilla.suse.com/show_bug.cgi?id=456), ...
 - Related merge requests: !123, !456, ...
 - Verification runs: [run name](url), ...
+
+## Commits
+
+- `abc1234` feat: add user login
+- `def5678` fix: handle null session
+- `ghi9012` style: run linter
+
+The `style` commit (`ghi9012`) is an automated linting pass and can be ignored. The `fix` commit (`def5678`) changes auth logic and warrants a separate look.
 ```
 
 Rules:
@@ -85,6 +93,10 @@ Rules:
 - Omit the `Related merge requests` line entirely if no related MRs/PRs are provided.
 - Omit the `Verification runs` line entirely if no runs are provided.
 - Do not include placeholder lines for missing sections.
+- Omit the `## Commits` section entirely if there is only one commit.
+- Populate the `## Commits` list using `git log <base>..<branch> --oneline`; use the short hash and full subject line for each entry.
+- After the list, add a single prose sentence (or two at most) noting: any `style`-type commits that reviewers can ignore (automated formatting/linting), and any distinct `feat`, `fix`, or `refactor` commits that warrant a separate look.
+- Omit the summary sentence if all commits are of the same logical type and none need special attention.
 
 ## Workflow
 
@@ -100,7 +112,14 @@ Rules:
    glab mr list --source-branch <branch> --state opened
    ```
    If one exists, show it to the user and **ask what to do**:
-   - **(a) Push onto the existing PR** — just `git push`; the commit appears in the open PR automatically. Do not open a new one.
+   - **(a) Push onto the existing PR** — `git push`; the commit appears in the open PR automatically. Do not open a new one. Then re-evaluate the PR/MR body: regenerate the `## Commits` section based on the updated commit range and update the PR/MR body accordingly.
+     ```bash
+     # GitHub — update body
+     gh pr edit <number> --body "<updated body>"
+
+     # GitLab — update body
+     glab mr update <iid> --description "<updated body>"
+     ```
    - **(b) Open a new PR anyway** — proceed with the steps below.
    - **(c) Abort** — stop here.
    Wait for the user's answer before continuing.
