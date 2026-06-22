@@ -117,7 +117,24 @@ Rules:
    ```
 7. Verify the MR has a resolved `sha` (see GitLab caveat below).
 8. If `sha` is null: recover using the steps in the caveat section.
-9. Return the MR URL to the user.
+9. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
+   ```bash
+   # GitLab
+   glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}/pipelines" \
+     | python3 -c "import json,sys; d=json.JSONDecoder(); o,_=d.raw_decode(sys.stdin.read()); [print(p['id'],p['status']) for p in o[:1]]"
+   ```
+   - If the pipeline **passes**: return the MR URL to the user.
+   - If the pipeline **fails**: fetch the failed job log and diagnose:
+     ```bash
+     # Get failed job id
+     glab api "projects/{namespace}%2F{repo}/pipelines/{pipeline_id}/jobs" \
+       | python3 -c "import json,sys; d=json.JSONDecoder(); o,_=d.raw_decode(sys.stdin.read()); [print(j['id'],j['status'],j['name']) for j in o]"
+     # Get log
+     glab api "projects/{namespace}%2F{repo}/jobs/{job_id}/trace"
+     ```
+   - If the failure is **trivial** (e.g. commit message style, lint error introduced by the new commits): fix it immediately — amend or rebase the commits, force-push, and re-poll the pipeline.
+   - If the failure is **non-trivial** (pre-existing infrastructure issue, flaky runner, unrelated test): report it to the user and return the MR URL without blocking.
+10. Return the MR URL to the user.
 
 ## GitLab caveat — MR created with no diff (sha: null)
 
