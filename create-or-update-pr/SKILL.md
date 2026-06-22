@@ -1,9 +1,9 @@
 ---
-name: create-pr
-description: Use when the user asks to create a PR, MR, merge request, pull request, push a branch, or commit and open a review request. Covers commit message conventions, AI label handling, and PR/MR body templating for GitHub, GitLab, Gitea, and Forgejo.
+name: create-or-update-pr
+description: Use when the user asks to create or update a PR, MR, merge request, pull request, push a branch, commit and open a review request, or update/amend an existing PR/MR body. Covers commit message conventions, AI label handling, PR/MR body templating, and updating the body of existing PRs/MRs for GitHub, GitLab, Gitea, and Forgejo.
 ---
 
-# Create PR / MR Skill
+# Create or Update PR / MR Skill
 
 ## IMPORTANT: Only use this skill when explicitly asked
 
