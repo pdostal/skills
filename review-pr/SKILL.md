@@ -1,12 +1,15 @@
 ---
 name: review-pr
-description: Use when the user asks to review a pull request, check a PR, analyse a PR, or post PR review comments. Covers both read-only analysis (plan mode: numbered list of issues) and posting inline GitHub/GitLab/Gitea/Forgejo review comments (build mode). Triggers on phrases like "review PR", "review pull request", "check PR #N", "analyse this PR", "review MR", "review merge request", "check MR #N", "analyse this MR", "post review comments".
+description: Use when the user asks to review a PR, check a PR, look at a PR, list PR suggestions, sort out suggestions, address review comments, handle reviewer feedback, implement suggestions, reply to a reviewer, or resolve PR threads. Triggers on phrases like "review PR", "check PR #N", "look at the PR", "there are N suggestions", "sort out suggestions", "address comments", "reply to Felix", "implement reviewer feedback", "review MR", "check MR #N".
 ---
 
-# PR Review Skill
+# PR Review & Suggestion Resolution Skill
 
-This skill provides a two-mode pull request review workflow using `gh` (GitHub CLI), `glab` (GitLab CLI), `tea` (Gitea CLI), `fj` (Forgejo CLI) as the
-primary tool, with `curl` as fallback.
+This skill covers two workflows:
+1. **Review mode** — analyse the diff and post inline review comments as a reviewer.
+2. **Resolve mode** — list, implement, and reply to existing suggestions/comments left by others.
+
+Uses `gh` (GitHub CLI) as the primary tool, with `curl` as fallback.
 
 ---
 
@@ -20,64 +23,135 @@ Otherwise auto-detect from the current branch:
 gh pr view --json number,title,headRefOid,baseRefOid,headRefName,baseRefName,url
 ```
 
-If that fails (not a GitHub repo, not authenticated, no open PR for this branch), report the
-error clearly and stop.
-
 Capture:
 - `PR_NUMBER` — integer PR number
-- `HEAD_SHA` — `headRefOid` (the commit_id required by the review comments API)
-- `BASE_REF` / `HEAD_REF` — branch names (for context)
-- `REPO` — derived from `gh repo view --json nameWithOwner -q .nameWithOwner`
+- `HEAD_SHA` — `headRefOid` (the original PR head SHA — use this for all API calls, not any new local commit SHA)
+- `BASE_REF` / `HEAD_REF` — branch names
+- `REPO` — `gh repo view --json nameWithOwner -q .nameWithOwner`
 
 ---
 
-## Step 2 — Fetch the diff
+## Step 2 — Fetch review threads (always use GraphQL)
+
+**Always use the GraphQL API** to fetch review threads — the REST comments endpoint lacks `isResolved` and `isOutdated` fields which are essential for correctly classifying threads.
+
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "OWNER", name: "REPO") {
+    pullRequest(number: PR_NUMBER) {
+      reviewThreads(first: 30) {
+        nodes {
+          id
+          isResolved
+          isOutdated
+          comments(first: 10) {
+            nodes {
+              databaseId
+              author { login }
+              body
+              path
+              line
+              originalLine
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+```
+
+Classify each thread:
+
+| `isResolved` | `isOutdated` | Action |
+|---|---|---|
+| `true` | any | **Skip** — already resolved, do not act on it |
+| `false` | `true` | **Skip** — comment is on an outdated diff position, already addressed |
+| `false` | `false` | **Active** — must be handled |
+
+When listing threads for the user, clearly mark resolved/outdated ones as such so they are not confused with open work.
+
+---
+
+## Resolve Mode — Handle active threads
+
+For each **active** thread:
+
+### A. Code suggestions (suggestion block in body)
+
+Implement the suggestion directly in the source file. Then:
+
+1. Run the project linter on the modified file (see git-commit skill).
+2. Commit using the git-commit skill conventions. Use `GIT_TRACE=1` if commit output is suppressed to diagnose failures.
+3. If commit or push fails due to GPG/SSH signing (YubiKey), **ask the user once** to run the command in their terminal. Do not retry in a loop.
+4. Reply to the thread (see Replying below).
+
+### B. General comments (not a suggestion block)
+
+Read the comment carefully. Implement what's needed, or if it's a discussion point, reply explaining the decision. Keep the reply to **1 sentence** (2–3 only if genuinely needed).
+
+### Replying to a thread
+
+Post the reply using `in_reply_to` with the original `HEAD_SHA` (not a new commit SHA):
+
+```bash
+gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments \
+  --method POST \
+  -f commit_id="$HEAD_SHA" \
+  -f path="<file>" \
+  -f side="RIGHT" \
+  -F line=<line> \
+  -F in_reply_to=<databaseId of first comment in thread> \
+  -f body="<reply>"
+```
+
+Reply style: **brief and direct** — 1 sentence max, 2–3 only if genuinely required.
+
+Examples of good replies:
+- `"Done, added \`-L\`."`
+- `"Removed the hint comment — the recommendation is already in variables.md."`
+- `"Implemented — now detects http(s):// URLs and fetches with curl; falls back to base64 otherwise."`
+
+### Commit strategy for resolved suggestions
+
+- Group trivial fixes (single-line changes, comment removals) into one commit per logical topic.
+- Implement non-trivial suggestions (new features, behaviour changes) as **separate commits**.
+- Follow the git-commit skill for message format, linting, and signing.
+
+---
+
+## Review Mode — Analyse diff and post comments as reviewer
+
+### Fetch the diff
 
 ```bash
 gh pr diff "$PR_NUMBER"
 ```
 
-This returns a unified diff with standard `@@` hunk headers. Parse it carefully:
+Parse carefully:
+- `diff --git a/<path> b/<path>` — file section start
+- `@@ -OLD_START,OLD_COUNT +NEW_START,NEW_COUNT @@` — hunk header
+- `+` lines — additions (RIGHT side); `-` lines — deletions (LEFT side); ` ` — context
 
-- Each file section starts with `diff --git a/<path> b/<path>`
-- The `--- a/<path>` / `+++ b/<path>` lines give you the file path on the new side
-- `@@` hunk headers have the form `@@ -OLD_START,OLD_COUNT +NEW_START,NEW_COUNT @@`
-- Lines starting with `+` are additions (RIGHT side), `-` are deletions (LEFT side),
-  ` ` (space) are context lines
+Track the **new-file line number**:
+- Context line: increment
+- `+` line: this is new_line, increment
+- `-` line: do NOT increment
 
-Track the current **new-file line number** as you walk through the diff:
-- On a context line: increment new_line counter
-- On a `+` line: this is new_line; increment
-- On a `-` line: do NOT increment new_line (it doesn't exist in the new file)
+### What to look for
 
-This mapping is essential for posting accurate inline comments.
+- **Bugs** — off-by-one, null dereferences, unchecked errors, wrong conditions
+- **Security** — injection risks, hardcoded secrets, missing auth checks
+- **Logic** — wrong algorithm, wrong variable, missing edge cases
+- **Resource management** — unclosed handles, memory leaks
+- **Concurrency** — race conditions, deadlocks
+- **API misuse** — wrong HTTP method, deprecated functions
+- **Test coverage** — new code paths with no tests
 
----
+Do NOT flag pure style nits or things not visible in the diff.
 
-## Step 3 — Analyse for issues
-
-Review the diff as a language-agnostic expert code reviewer. Look for, but don't limit to:
-
-- **Bugs** — off-by-one errors, null/nil dereferences, unchecked errors, wrong conditions
-- **Security** — injection risks, hardcoded secrets, unsafe deserialization, missing auth checks
-- **Logic** — incorrect algorithm, wrong variable used, missing edge case handling
-- **Resource management** — unclosed handles, missing defer/finally, memory leaks
-- **Concurrency** — race conditions, deadlocks, missing locks
-- **API misuse** — wrong HTTP method, missing required fields, deprecated functions
-- **Test coverage** — new code paths with no corresponding test additions
-- **Style / maintainability** — overly complex logic that could be simplified (only flag if significant)
-
-Focus on the changed lines (`+` lines) but use context lines to understand intent.
-
-Do NOT flag:
-- Pure style nits (formatting, naming conventions) unless they cause real problems
-- Things that are not visible in the diff
-
----
-
-## Plan Mode — Print numbered issue list
-
-When running in plan mode (read-only), after analysis print a numbered list in this exact format:
+### Plan Mode — print issue list
 
 ```
 PR #<number>: <title>
@@ -86,174 +160,99 @@ Base: <base_ref>  Head: <head_ref>
 
 Found <N> issue(s):
 
-1. [SEVERITY] file/path.ext:<start_line>-<end_line>  <short issue title>
+1. [SEVERITY] file/path.ext:<start_line>-<end_line>  <short title>
 
-   <start_line-2>:   <context line>
-   <start_line-1>:   <context line>
-   <start_line>:  +  <affected line(s)>
-   ...
-   <end_line>:    +  <affected line>
+   <context lines>
+   <start_line>:  +  <affected line>
 
-   Problem: <concise explanation of what is wrong and why it matters>
-   Suggestion: <one concrete fix or direction>
-
-2. [SEVERITY] ...
+   Problem: <concise explanation>
+   Suggestion: <concrete fix>
 ```
 
-Severity levels: `[CRITICAL]`, `[HIGH]`, `[MEDIUM]`, `[LOW]`
+Severity: `[CRITICAL]`, `[HIGH]`, `[MEDIUM]`, `[LOW]`
 
-If no issues are found, say so clearly: "No issues found in PR #N."
-
----
-
-## Build Mode — Post inline review comments
-
-When running in build mode, post the comments directly without repeating the plan-mode analysis output. If the user switches from plan to build mid-conversation (e.g. says "post suggestions now"), reuse the issues already identified — do not re-analyse the diff.
-
-After analysis (or reusing prior analysis), do the following for each issue:
-
-### Post one inline comment per issue
-
-Use `gh api` to post a pull request review comment pinned to the exact line:
+### Build Mode — post inline comments
 
 ```bash
-gh api \
-  repos/{owner}/{repo}/pulls/$PR_NUMBER/comments \
+gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments \
   --method POST \
   -f commit_id="$HEAD_SHA" \
-  -f path="<file path relative to repo root>" \
+  -f path="<file>" \
   -f side="RIGHT" \
-  -F line=<end_line_in_new_file> \
-  -f body="<comment body>"
+  -F line=<end_line> \
+  -f body="<body>"
 ```
 
-For a **line range** (when the issue spans multiple lines), also add:
-```bash
-  -f start_side="RIGHT" \
-  -F start_line=<start_line_in_new_file>
-```
+For line ranges add `-f start_side="RIGHT" -F start_line=<N>` (only when start < end).
 
-Note: `start_line` must be less than `line`. If they are equal, omit `start_line`/`start_side`
-and just use `line`.
+For deleted lines use `side=LEFT` and the old-file line number.
 
-For issues on **deleted lines** (LEFT side only), use `side=LEFT` and the old-file line number.
-
-**If `gh api` fails** (network error, auth issue, etc.), fall back to `curl`:
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer ${GH_TOKEN:-$GITHUB_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/comments" \
-  -d "{
-    \"commit_id\": \"$HEAD_SHA\",
-    \"path\": \"<path>\",
-    \"side\": \"RIGHT\",
-    \"line\": <line>,
-    \"body\": \"<body>\"
-  }"
-```
-
-**Comment body format** — keep it concise and actionable. When the fix is a one-to-one line replacement, use GitHub's suggestion block so the author can apply it with one click:
-
-```
-<brief explanation of the problem>
+Use GitHub suggestion blocks for one-to-one line fixes:
+````
+<brief explanation>
 
 ```suggestion
 <corrected line(s)>
 ```
-```
+````
 
-For issues where a suggestion block is not applicable (e.g. architectural changes, deletions, multi-file fixes), fall back to a short prose comment:
+**Fallback anchor strategy** (when exact line unavailable):
+1. Nearest `+` or context line in the same hunk
+2. First line of the file's first hunk
+3. Top-level comment: `gh pr comment $PR_NUMBER -b "..."`
 
-```
-**[SEVERITY] Short title**
+### Overall review summary
 
-<explanation of the problem>
+- **CRITICAL/HIGH** → ask user: request-changes or comment?
+- **MEDIUM/LOW only** → submit as `--comment` automatically
+- **No issues** → ask user before approving
 
-<suggested fix or direction>
-```
-
-### Anchor strategy when exact line is unavailable
-
-If you cannot determine the precise new-file line number for an issue (e.g. the problem is in
-a deleted block), fall back in order:
-1. Pin to the nearest `+` or context line in the same hunk
-2. Pin to the first line of the relevant file's first hunk
-3. Post as a top-level PR comment via `gh pr comment $PR_NUMBER -b "..."`
-
-### Post the overall review summary
-
-After all inline comments are posted, assess the overall severity:
-
-- **CRITICAL or HIGH issues found** → ask the user:
-  "Found [N] high/critical issues. Should I submit this as 'request changes' (blocks merge)
-  or 'comment' (non-blocking)? [request-changes/comment]"
-  Then run accordingly.
-- **MEDIUM or LOW issues only** → submit as `--comment` without asking:
-  ```bash
-  gh pr review "$PR_NUMBER" --comment -b "<summary>"
-  ```
-- **No issues** → submit as `--approve` (ask the user first):
-  "No issues found. Approve the PR? [yes/no]"
-
-Summary body template:
-```
-## PR Review Summary
-
-Reviewed <N> changed file(s). Found <N_issues> issue(s): <N_crit> critical, <N_high> high, <N_med> medium, <N_low> low.
-
-<One-paragraph overall assessment>
-
-All issues have been posted as inline comments above.
+```bash
+gh pr review "$PR_NUMBER" --comment -b "## PR Review Summary\n\n..."
+gh pr review "$PR_NUMBER" --request-changes -b "..."
+gh pr review "$PR_NUMBER" --approve -b "..."
 ```
 
 ---
 
 ## Error handling
 
-- If `gh` is not authenticated: `gh auth status` to diagnose, then report clearly.
-- If the PR does not exist or is not accessible: report and stop.
-- If a comment POST fails, print the error and continue with the remaining issues (do not abort).
-- If `HEAD_SHA` cannot be determined, try: `gh pr view $PR_NUMBER --json commits -q '.commits[-1].oid'`
+- `gh` not authenticated: run `gh auth status`, report clearly, stop.
+- PR not found: report and stop.
+- Comment POST fails: print error, continue with remaining threads.
+- `HEAD_SHA` missing: `gh pr view $PR_NUMBER --json commits -q '.commits[-1].oid'`
+- Commit/push signing failure: ask the user once to run it in their terminal.
 
 ---
 
-## Quick reference — key `gh` commands
+## Quick reference
 
 ```bash
-# Auto-detect current branch PR
+# Auto-detect PR
 gh pr view --json number,title,headRefOid,baseRefOid,headRefName,baseRefName,url
 
-# Get repo name
+# Repo name
 gh repo view --json nameWithOwner -q .nameWithOwner
 
 # Full diff
 gh pr diff <PR_NUMBER>
 
-# List changed files
-gh pr view <PR_NUMBER> --json files -q '.files[].path'
+# Review threads with resolved/outdated status (always use this over REST)
+gh api graphql -f query='{ repository(owner:"O", name:"R") { pullRequest(number:N) {
+  reviewThreads(first:30) { nodes { id isResolved isOutdated
+    comments(first:10) { nodes { databaseId author{login} body path line originalLine } }
+  } } } } }'
 
-# Post inline comment (line range)
-gh api repos/{owner}/{repo}/pulls/<PR>/comments \
-  --method POST \
-  -f commit_id=<SHA> -f path=<file> \
-  -f side=RIGHT -F start_line=<N> -F line=<M> \
-  -f start_side=RIGHT \
-  -f body=<text>
+# Reply to thread
+gh api repos/{owner}/{repo}/pulls/<PR>/comments --method POST \
+  -f commit_id=<HEAD_SHA> -f path=<file> -f side=RIGHT -F line=<N> \
+  -F in_reply_to=<comment_databaseId> -f body="<text>"
 
-# Post inline comment with suggestion block (one-click apply for author)
-# body should contain:  ```suggestion\n<corrected lines>\n```
-
-# Post top-level PR comment
+# Top-level comment
 gh pr comment <PR_NUMBER> -b "<text>"
 
-# Submit review as comment
-gh pr review <PR_NUMBER> --comment -b "<text>"
-
-# Submit review requesting changes
-gh pr review <PR_NUMBER> --request-changes -b "<text>"
-
-# Approve
-gh pr review <PR_NUMBER> --approve -b "<text>"
+# Submit review
+gh pr review <PR_NUMBER> --comment -b "<body>"
+gh pr review <PR_NUMBER> --request-changes -b "<body>"
+gh pr review <PR_NUMBER> --approve -b "<body>"
 ```

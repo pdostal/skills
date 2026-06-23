@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Use when the user asks to commit changes, amend commits, or reword commit messages. Covers linting, conventional commit format, scope reuse, body style, and the Co-Authored-By trailer.
+description: Use when the user asks to commit changes, amend commits, reword commit messages, run a linter before committing, tidy and commit, or push changes. Triggers on phrases like "commit", "commit and push", "amend", "reword", "run perltidy", "tidy and commit", "commit with conventional format".
 ---
 
 # Git Commit Skill
@@ -81,6 +81,23 @@ Co-Authored-By: Claude Sonnet 4.6
 5. Commit: `git commit -m "type(scope): Subject" -m "Body..." -m "Co-Authored-By: ..."`
    Or use a heredoc / temp file for multi-line messages.
 6. Verify with `git log --oneline -3` that the commit landed correctly.
+
+## When commit or push fails
+
+If `git commit` or `git push` fails silently or with a GPG/SSH signing error (e.g. YubiKey touch required, `agent refused operation`):
+
+1. **Ask the user once** to run the command in their terminal where the YubiKey/agent interaction works. Do not retry in a loop.
+2. Wait for confirmation that it succeeded before continuing.
+
+If the failure reason is unclear (output suppressed by a terminal multiplexer), prefix the command with `GIT_TRACE=1` to expose what git is actually doing:
+
+```bash
+GIT_TRACE=1 git commit -m "..."
+```
+
+`GIT_TRACE=1` is a useful one-off diagnostic prefix — do **not** recommend setting it permanently in the environment or `.gitconfig` (there is no `.gitconfig` equivalent). It is very noisy across all git operations.
+
+---
 
 ## Rewording existing commits
 

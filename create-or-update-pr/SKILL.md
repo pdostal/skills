@@ -98,11 +98,29 @@ Rules:
 - After the list, add a single prose sentence (or two at most) noting: any `style`-type commits that reviewers can ignore (automated formatting/linting), and any distinct `feat`, `fix`, or `refactor` commits that warrant a separate look.
 - Omit the summary sentence if all commits are of the same logical type and none need special attention.
 
+## Remote selection
+
+Always inspect all configured git remotes before pushing:
+
+```bash
+git remote -v
+```
+
+- If a remote named **`mine`** exists, **always push to `mine`** and use its URL to derive `<namespace>/<repo>` for the PR/MR head.
+- Fall back to `origin` only when `mine` does not exist.
+
+```bash
+# Prefer 'mine', fall back to 'origin'
+PUSH_REMOTE=$(git remote | grep -q '^mine$' && echo mine || echo origin)
+PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
+# e.g. git@github.com:pdostal/repo.git  →  pdostal/repo
+```
+
 ## Workflow
 
 1. Stage and commit with a conventional commit message.
-2. Push the branch to `origin`: `git push origin <branch>`
-3. Determine `<namespace>/<repo>` from the `origin` remote URL.
+2. Determine the push remote (see **Remote selection** above).
+3. Push the branch to the chosen remote: `git push <push-remote> <branch>`
 4. Check for an already-open PR/MR on this branch:
    ```bash
    # GitHub
@@ -111,28 +129,42 @@ Rules:
    # GitLab
    glab mr list --source-branch <branch> --state opened
    ```
-   If one exists, show it to the user and **ask what to do**:
-   - **(a) Push onto the existing PR** — `git push`; the commit appears in the open PR automatically. Do not open a new one. Then re-evaluate the PR/MR body: regenerate the `## Commits` section based on the updated commit range and update the PR/MR body accordingly.
-     ```bash
-     # GitHub — update body
-     gh pr edit <number> --body "<updated body>"
+   If one exists:
+   - Inspect which remote/fork the existing PR's head branch is pushed to (GitHub: `gh pr view <number> --json headRepositoryOwner,headRefName`; GitLab: check `source_project_id`).
+   - If the existing PR head matches the remote you just pushed to, show the PR to the user and **ask what to do**:
+     - **(a) Push onto the existing PR** — the commit appears in the open PR automatically. Do not open a new one. Then re-evaluate the PR/MR body: regenerate the `## Commits` section based on the updated commit range and update the PR/MR body accordingly.
+       ```bash
+       # GitHub — update body
+       gh pr edit <number> --body "<updated body>"
 
-     # GitLab — update body
-     glab mr update <iid> --description "<updated body>"
-     ```
-   - **(b) Open a new PR anyway** — proceed with the steps below.
-   - **(c) Abort** — stop here.
-   Wait for the user's answer before continuing.
+       # GitLab — update body
+       glab mr update <iid> --description "<updated body>"
+       ```
+     - **(b) Open a new PR anyway** — proceed with the steps below.
+     - **(c) Abort** — stop here.
+     Wait for the user's answer before continuing.
+   - If the existing PR head points to a **different** remote/fork than the one you pushed to, inform the user of the mismatch and ask how to proceed before continuing.
 5. Check for the `AI-Assisted` label; create it if missing.
-6. Create the MR with `--head <namespace>/<repo>` to force the correct head repo (see GitLab caveat below):
+6. Create the MR/PR with auto-delete of the source branch on merge enabled where supported, and with `--head <namespace>/<repo>` derived from the chosen push remote (see GitLab caveat below):
    ```bash
+   # GitLab — --remove-source-branch enables auto-delete on merge
    glab mr create \
      --source-branch <branch> \
      --target-branch master \
      --head <namespace>/<repo> \
      --title "<title>" \
      --description "<body>" \
-     --label "AI-Assisted"
+     --label "AI-Assisted" \
+     --remove-source-branch
+
+   # GitHub — --delete-branch enables auto-delete on merge
+   gh pr create \
+     --head <branch> \
+     --base master \
+     --title "<title>" \
+     --body "<body>" \
+     --label "AI-Assisted" \
+     --delete-branch
    ```
 7. Verify the MR has a resolved `sha` (see GitLab caveat below).
 8. If `sha` is null: recover using the steps in the caveat section.
@@ -171,11 +203,12 @@ multiple remotes are configured.
 ### Prevention
 
 Always pass `--head <namespace>/<repo>` where `<namespace>/<repo>` is derived
-from the `origin` remote URL. Extract it with:
+from the chosen push remote URL (prefer `mine` over `origin`). Extract it with:
 
 ```bash
-git remote get-url origin
-# e.g. gitlab@gitlab.suse.de:qac/qac-openqa-yaml.git  →  qac/qac-openqa-yaml
+PUSH_REMOTE=$(git remote | grep -q '^mine$' && echo mine || echo origin)
+git remote get-url "$PUSH_REMOTE"
+# e.g. gitlab@gitlab.suse.de:pdostal/repo.git  →  pdostal/repo
 ```
 
 ### Detection
@@ -193,7 +226,7 @@ glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}" --hostname {host} 
 
 1. Close the broken MR: `glab mr close {iid} --repo {namespace}/{repo}`
 2. Amend the commit to produce a new SHA: `git commit --amend --no-edit --reset-author`
-3. Force-push: `git push --force origin <branch>`
+3. Force-push: `git push --force <push-remote> <branch>`
 4. Recreate via the raw API (bypasses remote auto-detection entirely):
    ```bash
    glab api "projects/{namespace}%2F{repo}/merge_requests" --hostname {host} -X POST \
@@ -201,6 +234,7 @@ glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}" --hostname {host} 
      -f target_branch="master" \
      -f title="<title>" \
      -f "description=<body>" \
-     -f labels="AI-Assisted"
+     -f labels="AI-Assisted" \
+     -f should_remove_source_branch=true
    ```
 5. Verify `sha` again — it should resolve immediately when using the raw API.
