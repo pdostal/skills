@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Use when the user asks to commit changes, amend commits, reword commit messages, run a linter before committing, tidy and commit, or push changes. Triggers on phrases like "commit", "commit and push", "amend", "reword", "run perltidy", "tidy and commit", "commit with conventional format".
+description: Use when the user asks to commit changes, amend commits, reword commit messages, run a linter before committing, tidy and commit, or push changes. Triggers on phrases like "commit", "commit and push", "amend", "reword", "run perltidy", "tidy and commit", "commit with conventional format", "make a commit", "save my changes", "stage and commit", "write a commit message", "format and commit", "fix up the last commit", "squash commits", "run the linter", "push my work", "push to the branch". Do NOT trigger when the user explicitly asks to open or create a PR or MR — use the create-or-update-pr skill for that.
 ---
 
 # Git Commit Skill

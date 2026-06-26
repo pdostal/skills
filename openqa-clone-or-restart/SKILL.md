@@ -5,7 +5,9 @@ description: >
   and an openqa-clone-job or openqa-cli command template containing $JOB_ID,
   and wants a ready-to-run list of commands with all job IDs substituted in.
   Triggers on phrases like "clone jobs", "restart jobs", "openqa-clone-job",
-  "openqa-cli", or when a tests/overview URL is given alongside a suite name.
+  "openqa-cli", "re-run jobs", "requeue jobs", "re-trigger tests",
+  "retry failing tests", "clone failing jobs", "openQA jobs",
+  "openQA overview", or when a tests/overview URL is given alongside a suite name.
 ---
 
 # openQA clone or restart jobs skill

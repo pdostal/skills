@@ -1,6 +1,6 @@
 ---
 name: create-or-update-pr
-description: Use when the user asks to create or update a PR, MR, merge request, pull request, push a branch, commit and open a review request, or update/amend an existing PR/MR body. Covers commit message conventions, AI label handling, PR/MR body templating, and updating the body of existing PRs/MRs for GitHub, GitLab, Gitea, and Forgejo.
+description: Use when the user asks to create or update a PR, MR, merge request, pull request, push a branch, commit and open a review request, or update/amend an existing PR/MR body. Also triggers on: "submit a PR", "raise a pull request", "raise a merge request", "open a review", "draft a PR", "propose my changes", "publish my branch for review", "share my changes for review", "update the PR description", "update the MR description", "open a review request", "create a merge request". Covers commit message conventions, AI label handling, PR/MR body templating, and updating the body of existing PRs/MRs for GitHub, GitLab, Gitea, and Forgejo. Do NOT trigger on a plain "commit" or "commit and push" — those belong to the git-commit skill.
 ---
 
 # Create or Update PR / MR Skill
@@ -79,11 +79,11 @@ $SHORT_EXPLANATION_IN_SINGLE_PARAGRAPH
 
 ## Commits
 
-- `abc1234` feat: add user login
-- `def5678` fix: handle null session
-- `ghi9012` style: run linter
+- abc1234 feat: add user login
+- def5678 fix: handle null session
+- ghi9012 style: run linter
 
-The `style` commit (`ghi9012`) is an automated linting pass and can be ignored. The `fix` commit (`def5678`) changes auth logic and warrants a separate look.
+The `style` commit (ghi9012) is an automated linting pass and can be ignored. The `fix` commit (def5678) changes auth logic and warrants a separate look.
 ```
 
 Rules:
@@ -95,8 +95,13 @@ Rules:
 - Do not include placeholder lines for missing sections.
 - Omit the `## Commits` section entirely if there is only one commit.
 - Populate the `## Commits` list using `git log <base>..<branch> --oneline`; use the short hash and full subject line for each entry.
+- Write commit SHAs as bare short hashes **without backticks** — e.g. `abc1234`, not `` `abc1234` ``. On GitHub and GitLab, bare hashes auto-link to the commit; backticks render as code and suppress the link.
 - After the list, add a single prose sentence (or two at most) noting: any `style`-type commits that reviewers can ignore (automated formatting/linting), and any distinct `feat`, `fix`, or `refactor` commits that warrant a separate look.
 - Omit the summary sentence if all commits are of the same logical type and none need special attention.
+- For cross-repo references use platform shorthand instead of full URLs:
+  - **GitHub**: `owner/repo#N` for issues/PRs (e.g. `SUSE-Enceladus/gcemetadata#8`) — renders as a clickable link automatically.
+  - **GitLab**: `namespace/repo#N` for issues, `namespace/repo!N` for MRs — same auto-linking behaviour.
+  - Same-repo references: just `#N` (issue/PR) or `!N` (MR) as before.
 
 ## Remote selection
 

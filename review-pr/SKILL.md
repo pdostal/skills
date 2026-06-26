@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Use when the user asks to review a PR, check a PR, look at a PR, list PR suggestions, sort out suggestions, address review comments, handle reviewer feedback, implement suggestions, reply to a reviewer, or resolve PR threads. Triggers on phrases like "review PR", "check PR #N", "look at the PR", "there are N suggestions", "sort out suggestions", "address comments", "reply to Felix", "implement reviewer feedback", "review MR", "check MR #N".
+description: Use when the user asks to review a PR, check a PR, look at a PR, list PR suggestions, sort out suggestions, address review comments, handle reviewer feedback, implement suggestions, reply to a reviewer, or resolve PR threads. Triggers on phrases like "review PR", "check PR #N", "look at the PR", "there are N suggestions", "sort out suggestions", "address comments", "reply to a reviewer", "implement reviewer feedback", "review MR", "check MR #N", "respond to review comments", "fix reviewer suggestions", "go through the PR comments", "handle feedback", "apply suggestions", "there are review threads", "resolve threads", "leave a review", "post review comments", "look at the feedback", "act on the review".
 ---
 
 # PR Review & Suggestion Resolution Skill
@@ -86,6 +86,18 @@ Implement the suggestion directly in the source file. Then:
 2. Commit using the git-commit skill conventions. Use `GIT_TRACE=1` if commit output is suppressed to diagnose failures.
 3. If commit or push fails due to GPG/SSH signing (YubiKey), **ask the user once** to run the command in their terminal. Do not retry in a loop.
 4. Reply to the thread (see Replying below).
+5. Resolve the thread using the GraphQL `resolveReviewThread` mutation with the `id` (`PRRT_...`) captured in Step 2:
+
+```bash
+gh api graphql -f query='
+mutation {
+  resolveReviewThread(input: {threadId: "<PRRT_...id>"}) {
+    thread { isResolved }
+  }
+}'
+```
+
+Only resolve threads where the suggestion was fully implemented. Do **not** resolve type B (general comment) threads — those are for the reviewer to close.
 
 ### B. General comments (not a suggestion block)
 
@@ -247,6 +259,14 @@ gh api graphql -f query='{ repository(owner:"O", name:"R") { pullRequest(number:
 gh api repos/{owner}/{repo}/pulls/<PR>/comments --method POST \
   -f commit_id=<HEAD_SHA> -f path=<file> -f side=RIGHT -F line=<N> \
   -F in_reply_to=<comment_databaseId> -f body="<text>"
+
+# Resolve a thread (type A suggestions only — use the PRRT_... node id from Step 2)
+gh api graphql -f query='
+mutation {
+  resolveReviewThread(input: {threadId: "<PRRT_...id>"}) {
+    thread { isResolved }
+  }
+}'
 
 # Top-level comment
 gh pr comment <PR_NUMBER> -b "<text>"
