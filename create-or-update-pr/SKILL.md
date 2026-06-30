@@ -171,6 +171,17 @@ PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
      --label "AI-Assisted" \
      --delete-branch
    ```
+   After creating the MR, enable **"Delete source branch when merge request is accepted"** via the API (the `glab mr create` CLI does not expose this flag):
+   ```bash
+   # GitLab
+   glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}" -X PUT \
+     -f remove_source_branch=true
+
+   # GitHub — set auto-delete (repo level; individual PRs delete automatically if the repo setting is on)
+   # If the repo setting is off, enable it:
+   gh api "repos/{owner}/{repo}" -X PATCH -f delete_branch_on_merge=true
+   ```
+   If the API call fails (e.g. insufficient permissions), note it and continue — do not abort.
 7. Verify the MR has a resolved `sha` (see GitLab caveat below).
 8. If `sha` is null: recover using the steps in the caveat section.
 9. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
@@ -240,6 +251,6 @@ glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}" --hostname {host} 
      -f title="<title>" \
      -f "description=<body>" \
      -f labels="AI-Assisted" \
-     -f should_remove_source_branch=true
+     -f remove_source_branch=true
    ```
 5. Verify `sha` again — it should resolve immediately when using the raw API.
