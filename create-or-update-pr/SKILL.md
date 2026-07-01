@@ -38,7 +38,8 @@ not *how*. Skip the body entirely if the subject line is self-explanatory.
 
 - Types: `feat`, `fix`, `ci`, `test`, `chore`, `docs`, `refactor`, `perf`, `style`
 - Subject line: lowercase, imperative mood, no trailing period, ≤72 chars
-- Body: brief — avoid padding, filler phrases, or restating the diff
+- Body: brief — avoid padding, filler phrases, or restating the diff.
+  Follow the PR / MR body template rules.
 
 ## AI label
 
@@ -88,6 +89,7 @@ The `style` commit (ghi9012) is an automated linting pass and can be ignored. Th
 
 Rules:
 - The opening paragraph must be a single, concise paragraph — no bullet points, no headers.
+- Keep it short and direct: explain what was done, not the full backstory. Two or three sentences at most. Omit any sentence that does not add information a reviewer needs.
 - The PR/MR title must be plain English — do not apply the `type(scope):` conventional commit prefix to it.
 - Omit the `Related tickets` line entirely if no tickets are provided.
 - Omit the `Related merge requests` line entirely if no related MRs/PRs are provided.
