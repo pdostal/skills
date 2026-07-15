@@ -186,7 +186,17 @@ PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
    If the API call fails (e.g. insufficient permissions), note it and continue — do not abort.
 7. Verify the MR has a resolved `sha` (see GitLab caveat below).
 8. If `sha` is null: recover using the steps in the caveat section.
-9. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
+9. **Post a Redmine comment** — if the PR/MR body references any `poo#NNN` tickets, post a comment on each referenced Redmine issue with the PR/MR link. Extract ticket numbers from the body:
+   ```bash
+   echo "$PR_BODY" | grep -oP 'poo#\K[0-9]+'
+   ```
+   For each ticket number found, post a comment via the `progress-opensuse-org_update_redmine_issue` MCP tool (add a `notes` journal entry):
+   ```
+   notes: "I created pull request: $PR_URL"
+   ```
+   If the MCP tool is unavailable, use curl against the Redmine API. Do not abort the workflow if this step fails — log the error and continue.
+
+10. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
    ```bash
    # GitLab
    glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}/pipelines" \
@@ -202,8 +212,8 @@ PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
      glab api "projects/{namespace}%2F{repo}/jobs/{job_id}/trace"
      ```
    - If the failure is **trivial** (e.g. commit message style, lint error introduced by the new commits): fix it immediately — amend or rebase the commits, force-push, and re-poll the pipeline.
-   - If the failure is **non-trivial** (pre-existing infrastructure issue, flaky runner, unrelated test): report it to the user and return the MR URL without blocking.
-10. Return the MR URL to the user.
+    - If the failure is **non-trivial** (pre-existing infrastructure issue, flaky runner, unrelated test): report it to the user and return the MR URL without blocking.
+11. Return the MR URL to the user.
 
 ## GitLab caveat — MR created with no diff (sha: null)
 
