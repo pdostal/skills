@@ -1,6 +1,6 @@
 ---
 name: create-or-update-pr
-description: Use when the user asks to create or update a PR, MR, merge request, pull request, push a branch, commit and open a review request, or update/amend an existing PR/MR body. Also triggers on: "submit a PR", "raise a pull request", "raise a merge request", "open a review", "draft a PR", "propose my changes", "publish my branch for review", "share my changes for review", "update the PR description", "update the MR description", "open a review request", "create a merge request". Covers commit message conventions, AI label handling, PR/MR body templating, and updating the body of existing PRs/MRs for GitHub, GitLab, Gitea, and Forgejo. Do NOT trigger on a plain "commit" or "commit and push" — those belong to the git-commit skill.
+description: Use when the user asks to create or update a PR, MR, merge request, pull request, push a branch, commit and open a review request, or update/amend an existing PR/MR body. Also triggers on: "submit a PR", "raise a pull request", "raise a merge request", "open a review", "draft a PR", "propose my changes", "publish my branch for review", "share my changes for review", "update the PR description", "update the MR description", "open a review request", "create a merge request", "commit and create PR", "do the changes and open a PR", "push to mine and open a PR", "make the changes, commit, push, create PR". Covers commit message conventions, AI label handling, PR/MR body templating, and updating the body of existing PRs/MRs for GitHub, GitLab, Gitea, and Forgejo. Do NOT trigger on a plain "commit" or "commit and push" — those belong to the git-commit skill.
 ---
 
 # Create or Update PR / MR Skill
@@ -72,11 +72,12 @@ glab mr create --label "AI-Assisted" ...
 ## PR / MR body template
 
 ```
-$SHORT_EXPLANATION_IN_SINGLE_PARAGRAPH
+$WHAT_WAS_DONE_SHORT_PARAGRAPH.
 
-- Related tickets: [poo#123](https://progress.opensuse.org/issues/123), [bsc#456](https://bugzilla.suse.com/show_bug.cgi?id=456), ...
-- Related merge requests: !123, !456, ...
-- Verification runs: [run name](url), ...
+* Related ticket: [poo#123](https://progress.opensuse.org/issues/123)
+* Related failure: [openqa.suse.de/t123](https://openqa.suse.de/tests/123)
+* Related merge requests: !123, !456, ...
+* Verification runs:
 
 ## Commits
 
@@ -88,13 +89,18 @@ The `style` commit (ghi9012) is an automated linting pass and can be ignored. Th
 ```
 
 Rules:
-- The opening paragraph must be a single, concise paragraph — no bullet points, no headers.
-- Keep it short and direct: explain what was done, not the full backstory. Two or three sentences at most. Omit any sentence that does not add information a reviewer needs.
+- Each paragraph states **what was done** only — no background, no explanation of the bug, no "why it was broken". Use short, direct sentences.
+- **Small PR or single commit**: one short paragraph is enough.
+- **Large PR with multiple logical changes**: use two or three short paragraphs, one per logical change — each still stating only what was done.
 - The PR/MR title must be plain English — do not apply the `type(scope):` conventional commit prefix to it.
-- Omit the `Related tickets` line entirely if no tickets are provided.
-- Omit the `Related merge requests` line entirely if no related MRs/PRs are provided.
-- Omit the `Verification runs` line entirely if no runs are provided.
-- Do not include placeholder lines for missing sections.
+- Use `*` bullets (not `-`) for all metadata lines.
+- Use singular forms: `* Related ticket:`, `* Related failure:`, `* Verification runs:`.
+- `* Verification runs:` is **always present**, even when empty — leave it blank so the author can fill it in later.
+- Omit `* Related ticket:` if no ticket is provided.
+- Omit `* Related failure:` if there is no related failing run.
+- Omit `* Related merge requests:` if there are no related MRs/PRs.
+- Do not include placeholder lines for omitted sections (except `* Verification runs:` which is always kept).
+- **openQA links**: use the format `[openqa.suse.de/tNNN](https://openqa.suse.de/tests/NNN)`.
 - Omit the `## Commits` section entirely if there is only one commit.
 - Populate the `## Commits` list using `git log <base>..<branch> --oneline`; use the short hash and full subject line for each entry.
 - Write commit SHAs as bare short hashes **without backticks** — e.g. `abc1234`, not `` `abc1234` ``. On GitHub and GitLab, bare hashes auto-link to the commit; backticks render as code and suppress the link.
@@ -122,6 +128,20 @@ PUSH_REMOTE=$(git remote | grep -q '^mine$' && echo mine || echo origin)
 PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
 # e.g. git@github.com:pdostal/repo.git  →  pdostal/repo
 ```
+
+## Updating an existing PR/MR body
+
+When the user asks to change or update the PR/MR description, **always read the current body first** before making any edit:
+
+```bash
+# GitHub
+gh pr view <number> --json body -q .body
+
+# GitLab
+glab mr view <iid> --output json | python3 -c "import json,sys; print(json.load(sys.stdin)['description'])"
+```
+
+Apply only the requested change on top of the existing body. Never rewrite from scratch — manual edits made by the author must be preserved.
 
 ## Workflow
 
@@ -152,7 +172,7 @@ PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
      Wait for the user's answer before continuing.
    - If the existing PR head points to a **different** remote/fork than the one you pushed to, inform the user of the mismatch and ask how to proceed before continuing.
 5. Check for the `AI-Assisted` label; create it if missing.
-6. Create the MR/PR with auto-delete of the source branch on merge enabled where supported, and with `--head <namespace>/<repo>` derived from the chosen push remote (see GitLab caveat below):
+6. Create the MR/PR with `--head <namespace>/<repo>` derived from the chosen push remote (see GitLab caveat below):
    ```bash
    # GitLab — --remove-source-branch enables auto-delete on merge
    glab mr create \
@@ -164,23 +184,22 @@ PUSH_URL=$(git remote get-url "$PUSH_REMOTE")
      --label "AI-Assisted" \
      --remove-source-branch
 
-   # GitHub — --delete-branch enables auto-delete on merge
+   # GitHub — do NOT pass --delete-branch (that flag does not exist)
    gh pr create \
      --head <branch> \
      --base master \
      --title "<title>" \
      --body "<body>" \
-     --label "AI-Assisted" \
-     --delete-branch
+     --label "AI-Assisted"
    ```
-   After creating the MR, enable **"Delete source branch when merge request is accepted"** via the API (the `glab mr create` CLI does not expose this flag):
+   After creating the MR/PR, enable **"Delete source branch when merge request is accepted"** via the API:
    ```bash
-   # GitLab
+   # GitLab — the --remove-source-branch flag above usually suffices, but confirm via API:
    glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}" -X PUT \
      -f remove_source_branch=true
 
-   # GitHub — set auto-delete (repo level; individual PRs delete automatically if the repo setting is on)
-   # If the repo setting is off, enable it:
+   # GitHub — there is no per-PR delete-branch API; set it at the repo level so GitHub
+   # shows the "Delete branch" button automatically after every merge:
    gh api "repos/{owner}/{repo}" -X PATCH -f delete_branch_on_merge=true
    ```
    If the API call fails (e.g. insufficient permissions), note it and continue — do not abort.

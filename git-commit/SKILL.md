@@ -72,6 +72,16 @@ feat(publiccloud): Add retry logic for flaky SSH connections
 Co-Authored-By: Claude Sonnet 4.6
 ```
 
+## Choosing the push remote
+
+Before pushing, always run `git remote -v` to inspect available remotes. Then:
+
+- If a remote named `mine` exists → push to `mine`.
+- Else if a remote named `pdostal` exists → push to `pdostal`.
+- Otherwise → push to `origin`.
+
+Never push to `origin` when a personal remote (`mine` or `pdostal`) is available.
+
 ## Workflow
 
 1. Run linter on modified files; stage any formatting fixes.
@@ -82,6 +92,7 @@ Co-Authored-By: Claude Sonnet 4.6
    Or use a heredoc / temp file for multi-line messages.
    If a YubiKey signing error appears, tell the user to touch the key and retry immediately.
 6. Verify with `git log --oneline -3` that the commit landed correctly.
+7. When pushing, follow the **Choosing the push remote** rules above.
 
 ## When commit or push fails
 
