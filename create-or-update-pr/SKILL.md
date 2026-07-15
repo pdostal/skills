@@ -205,14 +205,17 @@ Apply only the requested change on top of the existing body. Never rewrite from 
    If the API call fails (e.g. insufficient permissions), note it and continue — do not abort.
 7. Verify the MR has a resolved `sha` (see GitLab caveat below).
 8. If `sha` is null: recover using the steps in the caveat section.
-9. **Post a Redmine comment** — if the PR/MR body references any `poo#NNN` tickets, post a comment on each referenced Redmine issue with the PR/MR link. Extract ticket numbers from the body:
+9. **Post a Redmine comment** — always post a comment on every `poo#NNN` ticket referenced anywhere in the PR/MR body or commit messages with the PR/MR URL. Extract ticket numbers from the body:
    ```bash
    echo "$PR_BODY" | grep -oP 'poo#\K[0-9]+'
    ```
-   For each ticket number found, post a comment via the `progress-opensuse-org_update_redmine_issue` MCP tool (add a `notes` journal entry):
+   For each ticket number found, add a journal note via the `redmine-progress-opensuse-org_update_redmine_issue` MCP tool:
    ```
-   notes: "I created pull request: $PR_URL"
+   issue_id: <NNN>
+   fields:
+     notes: "Fix submitted via <PR_URL>"
    ```
+   Use this exact note format — `"Fix submitted via <PR_URL>"` — so it is consistent with existing tracker conventions.
    If the MCP tool is unavailable, use curl against the Redmine API. Do not abort the workflow if this step fails — log the error and continue.
 
 10. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
