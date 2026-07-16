@@ -31,6 +31,44 @@ Capture:
 
 ---
 
+## Step 1.5 — Auto-hide known bot noise (os-autoinst/os-autoinst-distri-opensuse only)
+
+Applies before anything else, in both Review mode and Resolve mode, only when `REPO` is `os-autoinst/os-autoinst-distri-opensuse` (GitHub). Skip entirely for any other repo.
+
+Check for an issue comment authored by `github-actions[bot]` whose body starts with `Great PR! Please pay attention to the following items before merging:`. This is a top-level issue comment, not a review thread, so it won't show up in the Step 2 GraphQL query — check it separately:
+
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "os-autoinst", name: "os-autoinst-distri-opensuse") {
+    pullRequest(number: '"$PR_NUMBER"') {
+      comments(first: 50) {
+        nodes { id isMinimized author { login } body }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.comments.nodes[]
+  | select(.author.login=="github-actions" or .author.login=="github-actions[bot]")
+  | select(.body | startswith("Great PR! Please pay attention to the following items before merging:"))
+  | select(.isMinimized == false)
+  | .id'
+```
+
+For each `id` returned, minimize it with reason `RESOLVED`:
+
+```bash
+gh api graphql -f query='
+mutation {
+  minimizeComment(input: {subjectId: "<COMMENT_NODE_ID>", classifier: RESOLVED}) {
+    minimizedComment { isMinimized minimizedReason }
+  }
+}'
+```
+
+Do this silently; only mention it to the user if the mutation fails.
+
+---
+
 ## Step 2 — Fetch review threads (always use GraphQL)
 
 **Always use the GraphQL API** to fetch review threads — the REST comments endpoint lacks `isResolved` and `isOutdated` fields which are essential for correctly classifying threads.

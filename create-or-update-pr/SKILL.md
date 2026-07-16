@@ -235,7 +235,42 @@ Apply only the requested change on top of the existing body. Never rewrite from 
      ```
    - If the failure is **trivial** (e.g. commit message style, lint error introduced by the new commits): fix it immediately — amend or rebase the commits, force-push, and re-poll the pipeline.
     - If the failure is **non-trivial** (pre-existing infrastructure issue, flaky runner, unrelated test): report it to the user and return the MR URL without blocking.
-11. Return the MR URL to the user.
+11. **Auto-hide known bot noise** (`os-autoinst/os-autoinst-distri-opensuse` only, GitHub): check for an issue comment authored by `github-actions[bot]` whose body starts with `Great PR! Please pay attention to the following items before merging:`. If one exists and is not already minimized, hide it — see **Auto-hiding the os-autoinst-distri-opensuse bot checklist** below. Do this silently; only mention it to the user if the mutation fails. Skip entirely for any other repo.
+12. Return the MR URL to the user.
+
+## Auto-hiding the os-autoinst-distri-opensuse bot checklist
+
+Scope: only when the repo is `os-autoinst/os-autoinst-distri-opensuse` on GitHub.
+
+Fetch comments with minimized status in one GraphQL call, then hide the match:
+
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "os-autoinst", name: "os-autoinst-distri-opensuse") {
+    pullRequest(number: '"$PR_NUMBER"') {
+      comments(first: 50) {
+        nodes { id isMinimized author { login } body }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.comments.nodes[]
+  | select(.author.login=="github-actions" or .author.login=="github-actions[bot]")
+  | select(.body | startswith("Great PR! Please pay attention to the following items before merging:"))
+  | select(.isMinimized == false)
+  | .id'
+```
+
+For each `id` returned, minimize it with reason `RESOLVED`:
+
+```bash
+gh api graphql -f query='
+mutation {
+  minimizeComment(input: {subjectId: "<COMMENT_NODE_ID>", classifier: RESOLVED}) {
+    minimizedComment { isMinimized minimizedReason }
+  }
+}'
+```
 
 ## GitLab caveat — MR created with no diff (sha: null)
 
