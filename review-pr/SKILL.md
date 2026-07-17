@@ -31,7 +31,31 @@ Capture:
 
 ---
 
-## Step 1.5 — Auto-hide known bot noise (os-autoinst/os-autoinst-distri-opensuse only)
+## Step 1.5 — Use the existing checkout in the current directory (do not clone elsewhere)
+
+The current directory is already a checkout of the repository. Never `git clone` into
+`/tmp` or any other location for this skill — work directly in the current directory.
+
+1. Check for uncommitted changes first:
+   ```bash
+   git status --porcelain
+   ```
+   If there are unrelated local changes, **stop and ask the user** how to
+   proceed before switching branches. Do not stash or discard anything
+   automatically.
+2. Check out and sync the PR's head branch — this handles fork-based PRs
+   automatically (adds/uses the correct remote) and re-syncs if the branch
+   is already checked out:
+   ```bash
+   gh pr checkout $PR_NUMBER
+   ```
+3. If `gh pr checkout` fails because the current directory isn't a git repo,
+   or its remote doesn't match the PR's repo, **ask the user** how to
+   proceed — do not silently clone to `/tmp` as a workaround.
+
+---
+
+## Step 1.6 — Auto-hide known bot noise (os-autoinst/os-autoinst-distri-opensuse only)
 
 Applies before anything else, in both Review mode and Resolve mode, only when `REPO` is `os-autoinst/os-autoinst-distri-opensuse` (GitHub). Skip entirely for any other repo.
 
@@ -283,6 +307,9 @@ gh pr view --json number,title,headRefOid,baseRefOid,headRefName,baseRefName,url
 
 # Repo name
 gh repo view --json nameWithOwner -q .nameWithOwner
+
+# Check out the PR branch locally (in the current directory, handles forks automatically)
+gh pr checkout <PR_NUMBER>
 
 # Full diff
 gh pr diff <PR_NUMBER>
