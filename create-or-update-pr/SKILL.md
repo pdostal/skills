@@ -218,13 +218,15 @@ Apply only the requested change on top of the existing body. Never rewrite from 
    Use this exact note format — `"Fix submitted via <PR_URL>"` — so it is consistent with existing tracker conventions.
    If the MCP tool is unavailable, use curl against the Redmine API. Do not abort the workflow if this step fails — log the error and continue.
 
-10. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
+10. **Auto-hide known bot noise** (`os-autoinst/os-autoinst-distri-opensuse` only, GitHub) — check for the `github-actions[bot]` "Great PR!" checklist comment *before* starting the CI wait loop below (it's posted by a fast checklist check that finishes long before the rest of CI, so checking for it early avoids leaving it visible while the slower jobs run). If one exists and is not already minimized, hide it — see **Auto-hiding the os-autoinst-distri-opensuse bot checklist** below. Do this silently; only mention it to the user if the mutation fails. Skip entirely for any other repo.
+11. Return the MR URL to the user.
+12. **Check the CI pipeline** — wait for it to start, then poll until it finishes:
    ```bash
    # GitLab
    glab api "projects/{namespace}%2F{repo}/merge_requests/{iid}/pipelines" \
      | python3 -c "import json,sys; d=json.JSONDecoder(); o,_=d.raw_decode(sys.stdin.read()); [print(p['id'],p['status']) for p in o[:1]]"
    ```
-   - If the pipeline **passes**: return the MR URL to the user.
+   - If the pipeline **passes**: tell the user.
    - If the pipeline **fails**: fetch the failed job log and diagnose:
      ```bash
      # Get failed job id
@@ -234,9 +236,7 @@ Apply only the requested change on top of the existing body. Never rewrite from 
      glab api "projects/{namespace}%2F{repo}/jobs/{job_id}/trace"
      ```
    - If the failure is **trivial** (e.g. commit message style, lint error introduced by the new commits): fix it immediately — amend or rebase the commits, force-push, and re-poll the pipeline.
-    - If the failure is **non-trivial** (pre-existing infrastructure issue, flaky runner, unrelated test): report it to the user and return the MR URL without blocking.
-11. **Auto-hide known bot noise** (`os-autoinst/os-autoinst-distri-opensuse` only, GitHub): check for an issue comment authored by `github-actions[bot]` whose body starts with `Great PR! Please pay attention to the following items before merging:`. If one exists and is not already minimized, hide it — see **Auto-hiding the os-autoinst-distri-opensuse bot checklist** below. Do this silently; only mention it to the user if the mutation fails. Skip entirely for any other repo.
-12. Return the MR URL to the user.
+    - If the failure is **non-trivial** (pre-existing infrastructure issue, flaky runner, unrelated test): report it to the user.
 
 ## Auto-hiding the os-autoinst-distri-opensuse bot checklist
 
