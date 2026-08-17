@@ -140,6 +140,37 @@ Give the user, in this order:
    "post it" before calling `gh pr comment` / `glab mr note` / Redmine
    update.
 
+## Step 5 — link the VRs back to the source PR/MR
+
+When the VRs were cloned for a GitHub/GitLab PR/MR that has a
+`* Verification runs:` (or similarly named) placeholder line in its
+description — common in this org's PR template — offer to wire it up:
+
+1. Draft a PR/MR body edit that replaces the empty/placeholder verification
+   runs line with `* Verification runs: In comment below` (keep the rest of
+   the body untouched — fetch the current body first, edit only that line).
+2. Draft the actual comment: the same clones table from Step 4 plus the
+   `openqa-mon` command. Add a `Status` column (`running`/`passed`/`failed`/
+   etc., from `get_job_status`) when jobs haven't finished yet — do **not**
+   default to silently waiting/polling for completion before drafting or
+   posting. Post as soon as the user confirms, even if every row still says
+   `running`; a placeholder comment with live links and the `openqa-mon`
+   command is useful immediately, and results can be posted as a follow-up
+   comment/edit once jobs finish. Only wait first if the user explicitly
+   asks for final pass/fail results before posting.
+3. Show both drafts to the user and wait for explicit confirmation before
+   posting anything (same rule as Step 4.3 — never publish automatically).
+   If the user says "post it"/"post it right away", treat that as
+   confirmation to post immediately regardless of job state.
+4. On confirmation, update the body first, then post the comment, so the
+   description's "in comment below" claim is never left dangling even
+   momentarily:
+   ```sh
+   gh pr edit <PR> --repo <owner>/<repo> --body-file <edited-body.md>
+   gh pr comment <PR> --repo <owner>/<repo> --body-file <vr-comment.md>
+   ```
+   (Use `glab mr update --description`/`glab mr note` for GitLab.)
+
 ## Notes
 
 - Plan-mode friendly: steps 0–2 are pure research and can be done entirely
