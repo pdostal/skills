@@ -1,0 +1,76 @@
+# Runs the same checks documented in README.md's Development section, so the
+# git hooks and CI cannot drift.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Hygiene (whitespace, conflict markers, large files)
+        run: |
+          git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+          git ls-files | while read -r f; do
+            size=$(stat -c%s "$f")
+            if [ "$size" -gt 512000 ]; then
+              echo "$f is $((size / 1024))KB, over the 500KB limit" >&2
+              exit 1
+            fi
+          done
+
+      - name: Markdown lint
+        run: |
+          npm install -g markdownlint-cli@0.49.1
+          markdownlint -c .markdownlint.jsonc '**/*.md'
+
+      - name: Shell lint
+        run: |
+          shopt -s globstar nullglob
+          files=(**/*.sh)
+          if [ "${#files[@]}" -gt 0 ]; then
+            shellcheck "${files[@]}"
+            shfmt -i 2 -d "${files[@]}"
+          fi
+
+      - name: Commit message format (PR commits)
+        if: github.event_name == 'pull_request'
+        run: |
+          git log --format=%s "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" | while read -r subject; do
+            printf '%s\n' "$subject" > /tmp/msg
+            .githooks/commit-msg /tmp/msg
+          done
+
+      # Preview command, may change; treat as advisory rather than a hard gate.
+      - name: Agent Skills spec (advisory)
+        continue-on-error: true
+        run: gh skill publish --dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

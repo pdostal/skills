@@ -37,7 +37,7 @@ Co-Authored-By: Claude Sonnet 4.6
   Check with: `git log --format="%s" | grep -oP '\(\K[^)]+' | sort | uniq -c | sort -rn | head`
 - **Subject line:**
   - Must be ≤ 72 characters. The only exception is `Revert: "..."`.
-  - Starts with an **uppercase** letter after the `type(scope): ` prefix.
+  - Starts with an **uppercase** letter after the `type(scope):` prefix.
   - Imperative mood, no trailing period.
 - **Body** (optional):
   - Separated from subject by a blank line.

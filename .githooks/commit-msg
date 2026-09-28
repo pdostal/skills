@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Enforces Conventional Commits per git-commit/SKILL.md. Reused as-is by CI
+# (.github/workflows/ci.yml) against each commit subject in a PR.
+set -euo pipefail
+subject=$(head -n1 "$1")
+
+case "$subject" in
+"Merge "* | fixup\!* | squash\!*) exit 0 ;;
+esac
+if [[ "$subject" == Revert:* || "$subject" == Revert\ \"* ]]; then
+  exit 0
+fi
+
+types='feat|fix|ci|test|chore|docs|style'
+if ! [[ "$subject" =~ ^($types)(\([A-Za-z0-9_./-]+\))?:\ [A-Z] ]]; then
+  echo "commit-msg: subject must match 'type(scope): Subject' (types: feat, fix, ci, test, chore, docs, style)" >&2
+  exit 1
+fi
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: subject line must be <=72 characters (got ${#subject})" >&2
+  exit 1
+fi
+if [[ "$subject" == *. ]]; then
+  echo "commit-msg: subject line must not end with a period" >&2
+  exit 1
+fi

@@ -1,0 +1,11 @@
+{
+  // Default rules, minus ones that fight this repo's existing formatting
+  // conventions rather than catching real mistakes.
+  "default": true,
+  "MD013": false, // line length
+  "MD031": false, // blank lines around fenced code blocks
+  "MD032": false, // blank lines around lists
+  "MD033": false, // inline HTML (used intentionally in some skills)
+  "MD040": false, // fenced code blocks should have a language
+  "MD060": false // table column alignment/spacing
+}

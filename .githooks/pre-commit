@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Runs the checks documented in README.md's Development section against
+# staged files. Toggle individual checks in .githooks.config.
+set -euo pipefail
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+# shellcheck source=/dev/null
+[ -f .githooks.config ] && source .githooks.config
+
+mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACM)
+[ "${#staged[@]}" -eq 0 ] && exit 0
+
+status=0
+
+if [ "${HOOK_HYGIENE:-1}" = 1 ]; then
+  git diff --cached --check || status=1
+  for f in "${staged[@]}"; do
+    size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+    if [ "$size" -gt 512000 ]; then
+      echo "pre-commit: $f is $((size / 1024))KB, over the 500KB limit" >&2
+      status=1
+    fi
+  done
+fi
+
+md_files=()
+sh_files=()
+skill_files=()
+for f in "${staged[@]}"; do
+  case "$f" in
+  *.md) md_files+=("$f") ;;
+  *.sh) sh_files+=("$f") ;;
+  esac
+  case "$f" in
+  */SKILL.md | SKILL.md) skill_files+=("$f") ;;
+  esac
+done
+
+if [ "${HOOK_MARKDOWNLINT:-1}" = 1 ] && [ "${#md_files[@]}" -gt 0 ]; then
+  if command -v markdownlint >/dev/null; then
+    markdownlint -c .markdownlint.jsonc "${md_files[@]}" || status=1
+  else
+    echo "pre-commit: markdownlint not installed, skipping markdown lint" >&2
+  fi
+fi
+
+if [ "${HOOK_SHELLCHECK:-1}" = 1 ] && [ "${#sh_files[@]}" -gt 0 ]; then
+  if command -v shellcheck >/dev/null; then
+    shellcheck "${sh_files[@]}" || status=1
+  else
+    echo "pre-commit: shellcheck not installed, skipping" >&2
+  fi
+  if command -v shfmt >/dev/null; then
+    shfmt -i 2 -d "${sh_files[@]}" || status=1
+  else
+    echo "pre-commit: shfmt not installed, skipping" >&2
+  fi
+fi
+
+if [ "${HOOK_GITLEAKS:-1}" = 1 ]; then
+  if command -v gitleaks >/dev/null; then
+    gitleaks protect --staged --redact -v || status=1
+  else
+    echo "pre-commit: gitleaks not installed, skipping secret scan" >&2
+  fi
+fi
+
+if [ "${HOOK_SKILL_CHECK:-1}" = 1 ] && [ "${#skill_files[@]}" -gt 0 ]; then
+  if command -v gh >/dev/null; then
+    gh skill publish --dry-run || status=1
+  else
+    echo "pre-commit: gh not installed, skipping skill spec check" >&2
+  fi
+fi
+
+exit $status
