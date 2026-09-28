@@ -17,8 +17,12 @@ description: >
 Verification runs let a test-distribution change (a PR/MR, or a pushed
 branch) be exercised against real production job settings/assets before
 merging, without touching the actual production job history. This skill
-covers the full loop: find good jobs to clone, get explicit approval, clone
-them safely, and report back.
+covers the full loop: find good jobs to clone, clone them safely, and report
+back — fully autonomously, no approval/confirmation gates (see the note in
+Step 2; intentional exception to the general "confirm before posting" rule).
+
+**Prefer delegating to the `openqa-ops` subagent** (`task` tool) to run this end to end and
+keep the skill's detail out of the main thread.
 
 Read
 [Safely clone a job on a production instance](https://openqa-bites.github.io/posts/2023/2023-02-23-safely_clone_a_job_on_a_production_instance/)
@@ -41,54 +45,41 @@ You need:
 
 Never guess job IDs. Work outward from evidence:
 
-1. **Read the diff.** Identify which test module files (`tests/**/*.pm`) and
-   library files (`lib/**/*.pm`) changed, and grep the distro repo for
-   `loadtest(".../<module_name>"` to find which `main_*.pm` / YAML schedule
-   files load them, and under what condition (flags like
-   `PUBLIC_CLOUD_MIGRATE_SLEM`, `is_container_test`, etc). This tells you
-   which TEST scenarios actually exercise the changed code, and which ones
-   don't (don't waste a clone on a scenario that never runs the changed
-   module).
-2. **Check the linked ticket/failure first.** If the Redmine/Bugzilla ticket
-   or PR body links a specific failing openQA job, fetch it
-   (`get_job`/`get_job_details`). This is almost always the single most
-   valuable job to clone — it directly re-tests the reported bug. Note its
-   exact `TEST` name, `PUBLIC_CLOUD_PROVIDER`/arch/version — the TEST name in
-   the job settings is authoritative, not any TEST name you might guess from
-   file/module names (a module like `instance_overview.pm` is not necessarily
-   its own TEST suite; it's usually one module inside a larger scenario like
-   `slem_migration` or `publiccloud_slem_containers`).
-3. **Use full-text search on the openQA instance** (the `search` MCP tool) for
-   a module or test-suite name to discover which job groups/templates
-   actually schedule it, when grepping the repo alone doesn't resolve the
-   TEST name.
-4. **List recent jobs** for each candidate TEST name
-   (`list_jobs test=<name> limit=<n> summary=true`), across the
-   providers/architectures/product-versions relevant to the change. Prefer
-   **passed** baseline jobs for regression coverage (a new failure after
-   cloning then directly implicates the change) and reserve **failed**
-   jobs specifically for reproducing an exact reported bug.
-5. Don't over-collect. A handful of jobs that each exercise a distinct code
-   path (different provider, arch, product version, or literally the
-   reported-bug job) beats a large undifferentiated batch. If the user says
-   "not so much" about part of the list, cut it down rather than padding.
+1. **Read the diff.** Find which changed test/library files (`tests/**/*.pm`, `lib/**/*.pm`)
+   are loaded by which `main_*.pm`/YAML schedules via `loadtest(".../<module_name>"`, and
+   under what flag condition (e.g. `PUBLIC_CLOUD_MIGRATE_SLEM`). That tells you which TEST
+   scenarios actually exercise the change — don't clone a scenario that never runs it.
+2. **Check the linked ticket/failure first.** If the ticket/PR links a specific failing job,
+   fetch it (`get_job`/`get_job_details`) — almost always the single most valuable clone
+   target. Trust its actual `TEST`/`PUBLIC_CLOUD_PROVIDER`/arch/version settings over any
+   TEST name guessed from file/module names (a module like `instance_overview.pm` is usually
+   one part of a larger scenario, not its own TEST suite).
+3. **Full-text search the openQA instance** (`search` MCP tool) for a module/test-suite name
+   when grepping the repo alone doesn't resolve which job groups schedule it.
+4. **List recent jobs** per candidate TEST name (`list_jobs test=<name> limit=<n>
+   summary=true`) across relevant providers/arches/versions. Prefer **passed** baseline jobs
+   for regression coverage; reserve **failed** jobs for reproducing an exact reported bug.
+5. Don't over-collect — a handful of jobs each exercising a distinct code path beats a large
+   undifferentiated batch. If the user says "not so much", cut down rather than padding.
 
-## Step 2 — present for approval
+## Step 2 — record the plan (no approval gate)
 
-Always show the user a table before cloning anything:
+**Intentional exception**: unlike most skills in this collection, this workflow does not
+wait for user approval before cloning or for confirmation before posting (Step 4/5). This
+was a deliberate choice to let it run fully autonomously (e.g. via a subagent) — cloning
+uses `_GROUP=0` so it never pollutes dashboards or production history, which is what made
+this safe to waive.
+
+Before cloning, log the plan as a table (for the final report, not for approval):
 
 | # | Job | Scenario | Provider/Arch | Why |
 |---|---|---|---|---|
 | 1 | [id](https://host/tests/id) | `TEST_NAME` (version) | PROVIDER / ARCH | one line: what this job proves and why it was picked |
 
-Include the exact `openqa-clone-custom-git-refspec` command you intend to
-run. If useful, run it once with `-n` (dry-run) first — this makes real
-GET requests to resolve `vars.json`/PR metadata but **never calls the
-openQA API to create a job**, so it's safe to run without approval as a
-sanity check. Never run without `-n` before the user has approved the list.
-
-Wait for explicit approval. Adjust the list on feedback (drop/add/swap jobs)
-before proceeding.
+Run the exact `openqa-clone-custom-git-refspec` command with `-n` (dry-run) first as a
+sanity check — it makes real GET requests to resolve `vars.json`/PR metadata but never
+calls the openQA API to create a job. If the dry-run output looks wrong (unexpected job
+count, wrong scenario), stop and report rather than proceeding to the real clone.
 
 ## Step 3 — clone
 
@@ -99,21 +90,15 @@ openqa-clone-custom-git-refspec \
   [EXTRA_VAR=value ...]
 ```
 
-- One invocation per source host; comma-separate multiple job URLs from the
-  same host as the second argument.
-- `EXTRA_VAR=value` pairs are passed straight through as openQA setting
-  overrides on every cloned job. A common one: `EXCLUDE_MODULES=mod1,mod2`
-  to skip modules irrelevant to the change under test (e.g. maintenance
-  repo-transfer modules like `transfer_repos`/`download_repos` that have
-  nothing to do with the fix being verified) — call this out explicitly to
-  the user rather than assuming it, since it changes what actually gets
-  tested.
-- The tool already implements the full "safe clone" recipe: `_GROUP=0`
-  (job won't show on any dashboard or count toward a group), `BUILD` set to
-  `<repo>#<pr-or-branch>`, `TEST` suffixed with `@<repo>#<branch>` (won't
-  pollute the original scenario's Next/Previous history), and
-  `CASEDIR`/`PRODUCTDIR` pointed at the fork+branch. No manual
-  `_GROUP_ID=0`/`{TEST,BUILD}+=` juggling needed.
+- One invocation per source host; comma-separate multiple job URLs from the same host.
+- `EXTRA_VAR=value` pairs pass through as setting overrides on every cloned job. Common one:
+  `EXCLUDE_MODULES=mod1,mod2` to skip modules irrelevant to the change (e.g.
+  `transfer_repos`/`download_repos`) — call this out explicitly to the user rather than
+  assuming it, since it changes what actually gets tested.
+- The tool already implements the full "safe clone" recipe: `_GROUP=0` (won't show on any
+  dashboard), `BUILD=<repo>#<pr-or-branch>`, `TEST` suffixed `@<repo>#<branch>` (won't
+  pollute the original scenario's history), `CASEDIR`/`PRODUCTDIR` at the fork+branch. No
+  manual `_GROUP_ID=0`/`{TEST,BUILD}+=` juggling needed.
 
 After cloning, spot-check at least one clone with `get_job` and confirm
 `group_id: null`, `BUILD`/`CASEDIR` point at the fork+branch, and any
@@ -123,65 +108,30 @@ After cloning, spot-check at least one clone with `get_job` and confirm
 
 Give the user, in this order:
 
-1. A markdown table of the **clones** (not the originals) — columns: Clone
-   (linked), Scenario, Provider/Arch. Drop any column the user doesn't want
-   (e.g. they may not care about the "Original" job once clones exist).
-2. An `openqa-mon` command grouped by host:
-   ```
-   openqa-mon -fsc15 https://<host> -j <id1> <id2> <id3> ...
-   ```
-   (`-j` takes space-separated job IDs against one `-c15`-style host flag;
-   don't invent flags the user hasn't specified — mirror the exact form
-   they've asked for previously in the conversation if given one).
-3. If asked for a GitHub-comment-ready version, reuse the same table with
-   full `https://.../tests/<id>` links (or `openqa.suse.de/tNNN` shorthand)
-   so it renders correctly outside the chat. Never post it to the PR/ticket
-   without explicit confirmation — draft it, show it, wait for a clear
-   "post it" before calling `gh pr comment` / `glab mr note` / Redmine
-   update.
+1. A markdown table of the **clones** (not originals) — columns: Clone (linked), Scenario,
+   Provider/Arch. Drop columns the user doesn't want.
+2. An `openqa-mon` command grouped by host: `openqa-mon -fsc15 https://<host> -j <id1> <id2>
+   ...` — don't invent flags the user hasn't specified; mirror any form they've given before.
+3. If asked for a GitHub-comment-ready version, reuse the table with full
+   `https://.../tests/<id>` links (or `openqa.suse.de/tNNN` shorthand) and post it directly
+   — no confirmation gate for this skill (see Step 2).
 
 ## Step 5 — link the VRs back to the source PR/MR
 
-When the VRs were cloned for a GitHub/GitLab PR/MR that has a
-`* Verification runs:` (or similarly named) placeholder line in its
-description — common in this org's PR template — offer to wire it up:
-
-1. Draft a PR/MR body edit that replaces the empty/placeholder verification
-   runs line with `* Verification runs: In comment below` (keep the rest of
-   the body untouched — fetch the current body first, edit only that line).
-2. Draft the actual comment: the same clones table from Step 4 plus the
-   `openqa-mon` command. Add a `Status` column (`running`/`passed`/`failed`/
-   etc., from `get_job_status`) when jobs haven't finished yet — do **not**
-   default to silently waiting/polling for completion before drafting or
-   posting. Post as soon as the user confirms, even if every row still says
-   `running`; a placeholder comment with live links and the `openqa-mon`
-   command is useful immediately, and results can be posted as a follow-up
-   comment/edit once jobs finish. Only wait first if the user explicitly
-   asks for final pass/fail results before posting.
-3. Show both drafts to the user and wait for explicit confirmation before
-   posting anything (same rule as Step 4.3 — never publish automatically).
-   If the user says "post it"/"post it right away", treat that as
-   confirmation to post immediately regardless of job state.
-4. On confirmation, update the body first, then post the comment, so the
-   description's "in comment below" claim is never left dangling even
-   momentarily:
-   ```sh
-   gh pr edit <PR> --repo <owner>/<repo> --body-file <edited-body.md>
-   gh pr comment <PR> --repo <owner>/<repo> --body-file <vr-comment.md>
-   ```
-   (Use `glab mr update --description`/`glab mr note` for GitLab.)
+When the VRs were cloned for a GitHub/GitLab PR/MR with a `* Verification runs:`
+placeholder in its description, wire it up — see `references/link-to-pr.md`. Post the body
+edit and comment directly, no confirmation gate (see Step 2).
 
 ## Notes
 
-- Plan-mode friendly: steps 0–2 are pure research and can be done entirely
-  read-only, including the `-n` dry-run. Only Step 3 mutates anything.
-- If the reported bug's job uses a TEST name you didn't expect from reading
-  the code (e.g. the bug was filed against `publiccloud_slem_containers` but
-  the diff's own author assumed `slem_basic`), trust the job's actual
-  settings over assumptions from the diff — go verify by checking which
-  `main_*.pm` branch loads the failing module under those exact settings.
-- If the same class of fix also touches a shared/generic code path (e.g. a
-  library used by both transactional and plain-zypper systems), ask whether
-  the user wants coverage for the "other" path too (different product line,
-  different provider) rather than assuming the original bug report's scope
-  is the only thing worth verifying.
+- Steps 0–2 are pure research (including the `-n` dry-run); Step 3 onward mutates/posts
+  without pausing for approval, per the intentional exception noted in Step 2.
+- If the reported bug's job uses an unexpected TEST name, trust the job's actual settings
+  over diff-based assumptions — verify which `main_*.pm` branch loads the module under those
+  exact settings.
+- If the fix also touches a shared/generic code path, ask whether the user wants coverage
+  for the "other" path too rather than assuming the original bug report's scope is enough.
+
+## Reference files
+
+- `references/link-to-pr.md` — Step 5 in full: wiring cloned VRs back into the source PR/MR description and comment.

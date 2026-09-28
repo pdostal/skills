@@ -12,6 +12,9 @@ description: >
 
 # openQA clone or restart jobs skill
 
+**Prefer delegating to the `openqa-ops` subagent** (`task` tool) — this skill is pure
+research/templating (no mutation), a good fit to keep out of the main thread.
+
 ## Inputs
 
 The user provides:
@@ -64,45 +67,8 @@ Group by version/distri if multiple overview URLs were given.
 
 ## Command variants
 
-### openqa-clone-job
-
-Clones a job from one openQA instance to another.
-
-```sh
-openqa-clone-job --host <target-host> --from <source-host> $JOB_ID [--skip-deps] [VAR=value …]
-```
-
-- `--from <source-host>` — derive automatically from the overview URL hostname;
-  do not require the user to specify it unless their template already contains it.
-- `--host <target-host>` — always provided by the user in their template.
-- `--skip-deps` and any extra `VAR=value` overrides — pass through verbatim
-  from the user's template, appended after the job ID.
-
-Example output:
-
-```sh
-# EC2-BYOS-Updates / x86_64 / failed
-openqa-clone-job --host myhost.example.org --from openqa.suse.de 22839669 --skip-deps PUBLIC_CLOUD_DMS_REPO=
-```
-
-### openqa-cli
-
-Performs API actions (e.g. restart) directly on the source openQA instance.
-
-```sh
-openqa-cli api --host https://<source-host> -X POST jobs/$JOB_ID/restart
-```
-
-- The source host is derived automatically from the overview URL hostname.
-- If the user's template uses `openqa-cli`, substitute `$JOB_ID` into the
-  appropriate position in their template exactly as with `openqa-clone-job`.
-
-Example output:
-
-```sh
-# Azure-BYOS-Updates / aarch64 / failed
-openqa-cli api --host https://openqa.suse.de -X POST jobs/22839982/restart
-```
+Two template shapes are supported: `openqa-clone-job` and `openqa-cli`. See
+`references/command-variants.md` for exact syntax, flag handling, and examples of each.
 
 ---
 
@@ -112,3 +78,7 @@ openqa-cli api --host https://openqa.suse.de -X POST jobs/22839982/restart
 - If there are multiple overview URLs (different `version` or `distri`), process
   each separately and label the groups clearly in the output.
 - Keep the output list short and copy-paste ready — no extra prose between commands.
+
+## Reference files
+
+- `references/command-variants.md` — `openqa-clone-job` and `openqa-cli` syntax and examples.

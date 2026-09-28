@@ -49,7 +49,7 @@ Co-Authored-By: Claude Sonnet 4.6
   ```
   Adjust the model name to match the actual model in use.
 
-### Examples
+### Example
 
 ```
 fix(PC_DMS): Deregister SP7 modules before migrating to SLE 16.0
@@ -60,17 +60,7 @@ caused zypper migration to fail with exit 104 and HTTP 422.
 Co-Authored-By: Claude Sonnet 4.6
 ```
 
-```
-fix(PC_DMS): Use pc_zypper_call for repo add and remove calls
-
-Co-Authored-By: Claude Sonnet 4.6
-```
-
-```
-feat(publiccloud): Add retry logic for flaky SSH connections
-
-Co-Authored-By: Claude Sonnet 4.6
-```
+More examples in `references/examples.md`.
 
 ## Choosing the push remote
 
@@ -96,47 +86,18 @@ Never push to `origin` when a personal remote (`mine` or `pdostal`) is available
 
 ## When commit or push fails
 
-### YubiKey / SSH signing errors (`agent refused operation`)
-
-Always run `git commit` with `GIT_TRACE=1` so signing failures are visible
-immediately rather than silently swallowed:
-
-```bash
-GIT_TRACE=1 git commit -m "..."
-```
-
-If the output contains `agent refused operation` or `Couldn't sign message`:
-
-1. Tell the user: **"Please touch your YubiKey."**
-2. **Immediately retry** the exact same command — do not wait for the user to
-   confirm it succeeded first. The YubiKey touch unblocks the SSH agent and
-   the retry will succeed.
-3. If the retry also fails, ask the user to run the command themselves in their
-   terminal (where the agent interaction is working) and wait for confirmation.
-
-Do **not** ask the user to run the command in their terminal on the first
-failure — they are present and will touch the key.
-
-`GIT_TRACE=1` is a useful one-off diagnostic prefix — do **not** recommend
-setting it permanently in the environment or `.gitconfig`. It is very noisy
-across all git operations.
-
-### Other failures
-
-If the failure reason is unclear, check `GIT_TRACE=1` output and report the
-error to the user clearly before stopping.
+If a YubiKey/SSH signing error appears (`agent refused operation`): tell the user to touch
+the key and **immediately retry** the same command — do not ask them to run it themselves
+on the first failure. Full recovery steps in `references/yubikey-signing.md`.
 
 ---
 
 ## Rewording existing commits
 
-To reword the last N commits without changing their content:
+See `references/reword-commits.md` for the interactive-rebase recipe.
 
-```bash
-GIT_SEQUENCE_EDITOR="sed -i 's/^pick/reword/g'" git rebase -i HEAD~N
-# Then for each commit stopped:
-git commit --amend -m "new message"
-git rebase --continue
-```
+## Reference files
 
-If the editor is unavailable (e.g. `vi: No such file or directory`), the rebase will pause at each commit — use `git commit --amend -m "..."` then `git rebase --continue`.
+- `references/examples.md` — additional commit message examples.
+- `references/reword-commits.md` — rewording past commits without changing their content.
+- `references/yubikey-signing.md` — full YubiKey/SSH signing failure recovery steps.
