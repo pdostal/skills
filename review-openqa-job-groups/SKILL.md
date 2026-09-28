@@ -126,9 +126,3 @@ show it, and wait for a clear go-ahead before calling any mutating tool
 - A group can span multiple distros/products/versions at once; treat each `version`+`build`
   row as its own unit when finding "highest", but the highest-build-wins rule still applies
   across the whole group, not per version.
-
-## Reference files
-
-- `references/fast-path-report.md` — using `openqa-ai-report` snapshots to accelerate triage, and its coverage/freshness caveats.
-- `references/bugref-suggestion.md` — Step 5 evidence-based bugref matching in full.
-- `scripts/parse_job_details.py <saved-file-path>` — parses a truncated `get_job_details` dump.

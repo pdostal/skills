@@ -131,7 +131,3 @@ edit and comment directly, no confirmation gate (see Step 2).
   exact settings.
 - If the fix also touches a shared/generic code path, ask whether the user wants coverage
   for the "other" path too rather than assuming the original bug report's scope is enough.
-
-## Reference files
-
-- `references/link-to-pr.md` — Step 5 in full: wiring cloned VRs back into the source PR/MR description and comment.

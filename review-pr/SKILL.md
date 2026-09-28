@@ -16,11 +16,10 @@ out of the main thread. It has no `git commit`/`git push` access — if resolve 
 commit an implemented suggestion, it will hand control back to you for that step, then
 resume.
 
-## Step 1 — Identify the PR
+## Step 1 — Identify the PR and check out the repo
 
-If the user supplied a PR number, URL, or branch name, use that directly.
-
-Otherwise auto-detect from the current branch:
+If the user supplied a PR number, URL, or branch name, use that directly. Otherwise
+auto-detect from the current branch:
 
 ```bash
 gh pr view --json number,title,headRefOid,baseRefOid,headRefName,baseRefName,url
@@ -32,8 +31,6 @@ Capture:
 - `BASE_REF` / `HEAD_REF` — branch names
 - `REPO` — `gh repo view --json nameWithOwner -q .nameWithOwner`
 
-## Step 1.5 — Use the existing checkout in the current directory (do not clone elsewhere)
-
 The current directory is already a checkout of the repository. Never `git clone` into
 `/tmp` or elsewhere — work directly here.
 
@@ -44,14 +41,14 @@ The current directory is already a checkout of the repository. Never `git clone`
 3. If it fails (not a git repo, or remote mismatch), **ask the user** how to proceed —
    don't silently clone to `/tmp` as a workaround.
 
-## Step 1.6 — Auto-hide known bot noise (os-autoinst/os-autoinst-distri-opensuse only)
+## Step 2 — Auto-hide known bot noise (os-autoinst/os-autoinst-distri-opensuse only)
 
 Applies before anything else, in both modes, only when `REPO` is
 `os-autoinst/os-autoinst-distri-opensuse` (GitHub). Run `scripts/hide-bot-checklist.sh
 <pr_number>`. Do this silently; only mention it to the user if it fails. Skip entirely
 for any other repo.
 
-## Step 2 — Fetch review threads (always use GraphQL)
+## Step 3 — Fetch review threads (always use GraphQL)
 
 **Always use the GraphQL API** to fetch review threads — the REST comments endpoint
 lacks `isResolved` and `isOutdated` fields which are essential for correctly classifying
@@ -78,10 +75,3 @@ whichever the user asked for.
 - Comment POST fails: print error, continue with remaining threads.
 - `HEAD_SHA` missing: `gh pr view $PR_NUMBER --json commits -q '.commits[-1].oid'`
 - Commit/push signing failure: ask the user once to run it in their terminal.
-
-## Reference files
-
-- `references/review-mode.md` — diff parsing, what to look for, posting inline comments, review summary.
-- `references/resolve-mode.md` — handling active threads, replying, commit strategy.
-- `references/graphql-queries.md` — all GraphQL/REST call templates used by both modes.
-- `scripts/hide-bot-checklist.sh <pr_number>` — minimizes the os-autoinst-distri-opensuse bot checklist comment.

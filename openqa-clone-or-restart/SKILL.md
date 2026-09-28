@@ -78,7 +78,3 @@ Two template shapes are supported: `openqa-clone-job` and `openqa-cli`. See
 - If there are multiple overview URLs (different `version` or `distri`), process
   each separately and label the groups clearly in the output.
 - Keep the output list short and copy-paste ready — no extra prose between commands.
-
-## Reference files
-
-- `references/command-variants.md` — `openqa-clone-job` and `openqa-cli` syntax and examples.

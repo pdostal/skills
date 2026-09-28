@@ -93,10 +93,3 @@ on the first failure. Full recovery steps in `references/yubikey-signing.md`.
 ## Rewording existing commits
 
 See `references/reword-commits.md` for the interactive-rebase recipe.
-
-## Reference files
-
-- `references/examples.md` — additional commit message examples.
-- `references/linting.md` — per-language lint commands (Perl, Python) run before committing.
-- `references/reword-commits.md` — rewording past commits without changing their content.
-- `references/yubikey-signing.md` — full YubiKey/SSH signing failure recovery steps.
