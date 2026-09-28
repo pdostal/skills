@@ -52,10 +52,3 @@ auto-hide bot noise, and poll CI.
 **Delegating to a subagent?** Do step 1 (commit+push, via the git-commit skill) yourself
 first, then hand off the rest of the workflow to the `pr-ops` subagent (`task` tool) — it
 has no `git commit`/`git push` access and expects that step already done.
-
-## Reference files
-
-- `references/workflow-github.md` / `references/workflow-gitlab.md` — full step-by-step procedure per platform.
-- `references/pr-body-template.md` — full PR/MR body template and formatting rules.
-- `references/gitlab-sha-null-caveat.md` — root cause, detection, and recovery for GitLab MRs created with `sha: null`.
-- `scripts/hide-bot-checklist.sh <pr_number>` — minimizes the os-autoinst-distri-opensuse bot checklist comment.
