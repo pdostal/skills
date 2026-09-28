@@ -9,10 +9,8 @@ description: Use when the user asks to commit changes, amend commits, reword com
 
 Before committing, always:
 
-1. **Lint the code.** Run the project's linter on any modified files. For Perl projects with `.perltidyrc`, run:
-   ```bash
-   perltidy --profile=.perltidyrc <file> -o /tmp/tidy.pm && diff <file> /tmp/tidy.pm || cp /tmp/tidy.pm <file>
-   ```
+1. **Lint the code.** Run the project's linter on any modified files.
+   Per-language conventions (Perl, Python) in `references/linting.md`.
    Stage any linter-induced changes before committing.
 
 2. **Review the diff.** Run `git diff --cached --stat` to confirm only intended files are staged.
@@ -99,5 +97,6 @@ See `references/reword-commits.md` for the interactive-rebase recipe.
 ## Reference files
 
 - `references/examples.md` — additional commit message examples.
+- `references/linting.md` — per-language lint commands (Perl, Python) run before committing.
 - `references/reword-commits.md` — rewording past commits without changing their content.
 - `references/yubikey-signing.md` — full YubiKey/SSH signing failure recovery steps.
