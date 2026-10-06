@@ -1,6 +1,6 @@
 # Step 5 — link the VRs back to the source PR/MR
 
-When the VRs were cloned for a GitHub/GitLab PR/MR that has a
+When the VRs were cloned for a GitHub/GitLab/Gitea/Forgejo PR/MR that has a
 `* Verification runs:` (or similarly named) placeholder line in its
 description — common in this org's PR template — wire it up:
 
@@ -20,6 +20,9 @@ description — common in this org's PR template — wire it up:
    gh pr edit <PR> --repo <owner>/<repo> --body-file <edited-body.md>
    gh pr comment <PR> --repo <owner>/<repo> --body-file <vr-comment.md>
    ```
-   (Use `glab mr update --description`/`glab mr note` for GitLab.)
-   If running as the `openqa-ops` subagent (no `gh`/`glab` access), hand both
+   Other forges (see `create-or-update-pr/references/forge-ops.md`):
+   `glab mr update <IID> -R <ns>/<repo> --description-file <f>` + `glab mr note create <IID> -R <ns>/<repo> -m "$(cat <f>)"`;
+   `tea pulls edit <N> -r <owner>/<repo> --description-file <f>` + `tea comment <N> -r <owner>/<repo> "$(cat <f>)"`;
+   `fj pr comment <N> -r <owner>/<repo> --body-file <f>` (Forgejo body edit: REST API).
+   If running as the `openqa-ops` subagent (no forge CLI access), hand both
    drafts to the primary agent to post immediately instead.

@@ -1,8 +1,9 @@
 #!/bin/sh
 # Minimize the github-actions[bot] "Great PR!" checklist comment.
-# Scope: os-autoinst/os-autoinst-distri-opensuse only. Usage: hide-bot-checklist.sh <pr_number>
+# No-op (exit 0) outside os-autoinst/os-autoinst-distri-opensuse. Usage: hide-bot-checklist.sh <pr_number>
 set -eu
 PR_NUMBER="$1"
+[ "$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)" = "os-autoinst/os-autoinst-distri-opensuse" ] || exit 0
 
 ids=$(gh api graphql -f query='
 {

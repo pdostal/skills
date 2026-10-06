@@ -1,4 +1,4 @@
-# GraphQL / API quick reference
+# GitHub (`gh`) quick reference
 
 ```bash
 # Auto-detect PR
@@ -53,4 +53,12 @@ gh pr comment <PR_NUMBER> -b "<text>"
 gh pr review <PR_NUMBER> --comment -b "<body>"
 gh pr review <PR_NUMBER> --request-changes -b "<body>"
 gh pr review <PR_NUMBER> --approve -b "<body>"
+
+# Inline review comment (new)
+gh api repos/{owner}/{repo}/pulls/<PR>/comments --method POST \
+  -f commit_id="<HEAD_SHA>" -f path="<file>" -f side="RIGHT" -F line=<end_line> -f body="<body>"
+# Ranges: add -f start_side=RIGHT -F start_line=<N> (only when start < end).
+# Deleted lines: side=LEFT + old-file line number. One-to-one fixes: use a ```suggestion block in the body.
 ```
+
+Thread map: `isResolved`/`isOutdated` come straight from the GraphQL query; thread id is `id` (`PRRT_...`).

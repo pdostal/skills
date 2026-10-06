@@ -23,8 +23,8 @@ Uses `gh`. Commit message format and push-remote selection follow the **git-comm
 3. Ensure the `AI-Assisted` label exists (see above), apply it.
 4. Create the PR:
    ```bash
-   # Do NOT pass --delete-branch — that flag does not exist
-   gh pr create --head <branch> --base master --title "<title>" --body "<body>" --label "AI-Assisted"
+   # No --delete-branch flag exists; --base defaults to the repo default branch
+   gh pr create --head <branch> --title "<title>" --body "<body>" --label "AI-Assisted"
    ```
    Then enable delete-on-merge at the repo level (per-PR API doesn't exist for this on GitHub):
    ```bash

@@ -27,7 +27,7 @@ Uses `glab`. Commit message format and push-remote selection follow the **git-co
    ```bash
    # --remove-source-branch enables auto-delete on merge
    glab mr create \
-     --source-branch <branch> --target-branch master --head <namespace>/<repo> \
+     --source-branch <branch> --head <namespace>/<repo> \
      --title "<title>" --description "<body>" --label "AI-Assisted" --remove-source-branch
    ```
    Confirm delete-on-merge is actually set (the flag above usually suffices, but verify via API):

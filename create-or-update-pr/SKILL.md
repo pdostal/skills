@@ -20,10 +20,10 @@ Detect from the git remote URL (or ask if unclear), then load the matching workf
 |---|---|---|
 | GitHub | `gh` | `references/workflow-github.md` |
 | GitLab | `glab` | `references/workflow-gitlab.md` |
-| Gitea | `tea` | mirror `workflow-github.md` with `tea` equivalents |
-| Forgejo | `fj` | mirror `workflow-github.md` with `fj` equivalents |
+| Gitea | `tea` | `references/workflow-gitea.md` |
+| Forgejo | `fj` | `references/workflow-forgejo.md` |
 
-Fall back to `curl` against the API only when the native tool is unavailable or not authenticated.
+Per-forge command equivalents: `references/forge-ops.md`. Fall back to `curl` against the API only when the native tool is unavailable or not authenticated.
 
 ## Commit messages and push remote
 
@@ -38,8 +38,7 @@ for every PR/MR body, not just large ones.
 ## Updating an existing PR/MR body
 
 When the user asks to change or update the PR/MR description, **always read the current body
-first** before making any edit (`gh pr view <number> --json body -q .body` /
-`glab mr view <iid> --output json`). Apply only the requested change on top of the existing
+first** before making any edit ("View body" row in `references/forge-ops.md`). Apply only the requested change on top of the existing
 body. Never rewrite from scratch — manual edits made by the author must be preserved.
 
 ## Workflow

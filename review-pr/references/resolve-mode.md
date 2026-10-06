@@ -1,6 +1,6 @@
 # Resolve Mode — Handle active threads
 
-For each **active** thread (see main SKILL.md Step 2 classification):
+For each **active** thread (see main SKILL.md Step 3 classification):
 
 ## A. Code suggestions (suggestion block in body)
 
@@ -13,7 +13,7 @@ Implement the suggestion directly in the source file. Then:
      ask it to commit+push and resume you (same `task_id`) to continue at step 3.
 3. If commit or push fails due to GPG/SSH signing (YubiKey), **ask the user once** to run the command in their terminal. Do not retry in a loop.
 4. Reply to the thread (see Replying below).
-5. Resolve the thread using the GraphQL `resolveReviewThread` mutation with the `id` (`PRRT_...`) captured in Step 2 — see `references/graphql-queries.md`.
+5. Resolve the thread (GitHub: GraphQL `resolveReviewThread` mutation) using the thread id captured in Step 3 — see the forge reference.
 
 Only resolve threads where the suggestion was fully implemented. Do **not** resolve type B (general comment) threads — those are for the reviewer to close.
 
@@ -23,7 +23,7 @@ Read the comment carefully. Implement what's needed, or if it's a discussion poi
 
 ## Replying to a thread
 
-Post the reply using `in_reply_to` with the original `HEAD_SHA` (not a new commit SHA) — see the reply command in `references/graphql-queries.md`.
+Post the reply with the forge reference's reply command. On GitHub use `in_reply_to` with the original `HEAD_SHA` (not a new commit SHA).
 
 Reply style: **brief and direct** — 1 sentence max, 2–3 only if genuinely required.
 

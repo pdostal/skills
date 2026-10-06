@@ -2,9 +2,7 @@
 
 ## Fetch the diff
 
-```bash
-gh pr diff "$PR_NUMBER"
-```
+Use the forge reference's diff command.
 
 Parse carefully:
 - `diff --git a/<path> b/<path>` — file section start
@@ -50,21 +48,11 @@ Severity: `[CRITICAL]`, `[HIGH]`, `[MEDIUM]`, `[LOW]`
 
 ## Build Mode — post inline comments
 
-```bash
-gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments \
-  --method POST \
-  -f commit_id="$HEAD_SHA" \
-  -f path="<file>" \
-  -f side="RIGHT" \
-  -F line=<end_line> \
-  -f body="<body>"
-```
+Use the forge reference's inline-comment command with the original `HEAD_SHA`.
+For line ranges use its range option (only when start < end); for deleted lines use the
+old-file line number on the LEFT/old side.
 
-For line ranges add `-f start_side="RIGHT" -F start_line=<N>` (only when start < end).
-
-For deleted lines use `side=LEFT` and the old-file line number.
-
-Use GitHub suggestion blocks for one-to-one line fixes:
+Use the forge's suggestion block for one-to-one line fixes (GitHub:
 ````
 <brief explanation>
 
@@ -72,11 +60,12 @@ Use GitHub suggestion blocks for one-to-one line fixes:
 <corrected line(s)>
 ```
 ````
+GitLab: `suggestion:-0+0`; see its reference).
 
 **Fallback anchor strategy** (when exact line unavailable):
 1. Nearest `+` or context line in the same hunk
 2. First line of the file's first hunk
-3. Top-level comment: `gh pr comment $PR_NUMBER -b "..."`
+3. Top-level comment (forge reference)
 
 ## Overall review summary
 
@@ -84,8 +73,4 @@ Use GitHub suggestion blocks for one-to-one line fixes:
 - **MEDIUM/LOW only** → submit as `--comment` automatically
 - **No issues** → ask user before approving
 
-```bash
-gh pr review "$PR_NUMBER" --comment -b "## PR Review Summary\n\n..."
-gh pr review "$PR_NUMBER" --request-changes -b "..."
-gh pr review "$PR_NUMBER" --approve -b "..."
-```
+Submit with the forge reference's review commands (GitHub: `--comment`/`--request-changes`/`--approve`; GitLab and Gitea differ — see their references).

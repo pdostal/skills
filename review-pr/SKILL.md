@@ -9,7 +9,15 @@ This skill covers two workflows:
 1. **Review mode** — analyse the diff and post inline review comments as a reviewer. See `references/review-mode.md`.
 2. **Resolve mode** — list, implement, and reply to existing suggestions/comments left by others. See `references/resolve-mode.md`.
 
-Uses `gh` (GitHub CLI) as the primary tool, with `curl` as fallback. GraphQL/REST call templates for both modes are in `references/graphql-queries.md`.
+Detect the forge from the git remote URL (ask if unclear) and use its native CLI, with `curl`/REST as fallback. Command templates for both modes:
+
+| Forge | CLI | Reference |
+|---|---|---|
+| GitHub | `gh` | `references/forge-github.md` |
+| GitLab | `glab` | `references/forge-gitlab.md` |
+| Gitea / Forgejo | `tea` (`fj`) | `references/forge-gitea.md` |
+
+Below, "forge reference" means the file for the detected forge; PR means MR on GitLab.
 
 **Prefer delegating to the `pr-ops` subagent** (`task` tool) to keep this skill's detail
 out of the main thread. It has no `git commit`/`git push` access — if resolve mode needs to
@@ -19,40 +27,35 @@ resume.
 ## Step 1 — Identify the PR and check out the repo
 
 If the user supplied a PR number, URL, or branch name, use that directly. Otherwise
-auto-detect from the current branch:
-
-```bash
-gh pr view --json number,title,headRefOid,baseRefOid,headRefName,baseRefName,url
-```
+auto-detect from the current branch (view command in the forge reference).
 
 Capture:
-- `PR_NUMBER` — integer PR number
-- `HEAD_SHA` — `headRefOid` (the original PR head SHA — use this for all API calls, not any new local commit SHA)
+- `PR_NUMBER` — integer PR number (MR iid)
+- `HEAD_SHA` — the original PR head SHA (GitHub `headRefOid`, GitLab `diff_refs.head_sha`, Gitea `.head.sha`) — use this for all API calls, not any new local commit SHA
 - `BASE_REF` / `HEAD_REF` — branch names
-- `REPO` — `gh repo view --json nameWithOwner -q .nameWithOwner`
+- `REPO` — owner/name as given in the forge reference
 
 The current directory is already a checkout of the repository. Never `git clone` into
 `/tmp` or elsewhere — work directly here.
 
 1. `git status --porcelain` — if there are unrelated local changes, **stop and ask the
    user** before switching branches. Don't stash/discard automatically.
-2. `gh pr checkout $PR_NUMBER` — handles fork-based PRs automatically and re-syncs if
+2. Check out the PR with the forge's checkout command — handles fork-based PRs and re-syncs if
    already checked out.
 3. If it fails (not a git repo, or remote mismatch), **ask the user** how to proceed —
    don't silently clone to `/tmp` as a workaround.
 
 ## Step 2 — Auto-hide known bot noise (os-autoinst/os-autoinst-distri-opensuse only)
 
-Applies before anything else, in both modes, only when `REPO` is
-`os-autoinst/os-autoinst-distri-opensuse` (GitHub). Run `scripts/hide-bot-checklist.sh
-<pr_number>`. Do this silently; only mention it to the user if it fails. Skip entirely
-for any other repo.
+GitHub only, before anything else, in both modes. Run `scripts/hide-bot-checklist.sh
+<pr_number>` (no-op outside `os-autoinst/os-autoinst-distri-opensuse`). Do this silently;
+only mention it to the user if it fails. Skip on other forges.
 
-## Step 3 — Fetch review threads (always use GraphQL)
+## Step 3 — Fetch review threads
 
-**Always use the GraphQL API** to fetch review threads — the REST comments endpoint
-lacks `isResolved` and `isOutdated` fields which are essential for correctly classifying
-threads. Query template in `references/graphql-queries.md`.
+Use the forge reference's thread query. On GitHub **always use GraphQL** — the REST comments
+endpoint lacks `isResolved` and `isOutdated`, which are essential for classifying threads.
+Other forges map the same two flags as described in their reference.
 
 Classify each thread:
 
@@ -70,8 +73,8 @@ whichever the user asked for.
 
 ## Error handling
 
-- `gh` not authenticated: run `gh auth status`, report clearly, stop.
+- CLI not authenticated: run its auth check (`gh auth status`, `glab auth status`, `tea login list`, `fj whoami`), report clearly, stop.
 - PR not found: report and stop.
 - Comment POST fails: print error, continue with remaining threads.
-- `HEAD_SHA` missing: `gh pr view $PR_NUMBER --json commits -q '.commits[-1].oid'`
+- `HEAD_SHA` missing: GitHub `gh pr view $PR_NUMBER --json commits -q '.commits[-1].oid'`; elsewhere re-read it from the forge reference's view command.
 - Commit/push signing failure: ask the user once to run it in their terminal.
